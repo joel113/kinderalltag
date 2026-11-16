@@ -1,0 +1,16 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+app/google-services.json
+keystore.properties
+*.jks
+*.keystore
+.firebase/
+node_modules/
+*-debug.log
+.DS_Store
+.idea/
+.env
+.env.*
+!.env.example

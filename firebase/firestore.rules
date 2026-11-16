@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function member() {
+      return request.auth != null && exists(/databases/$(database)/documents/households/family/members/$(request.auth.uid));
+    }
+    function date(value) { return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
+    function text(value, max) { return value is string && value.size() > 0 && value.size() <= max; }
+    function timeAt(times, index) {
+      return times.size() <= index || (times[index] is string && times[index].matches('^([01][0-9]|2[0-3]):[0-5][0-9]$'));
+    }
+    function validTimes(times) {
+      return times is list && times.size() > 0 && times.size() <= 8 && times.toSet().size() == times.size()
+        && timeAt(times, 0) && timeAt(times, 1) && timeAt(times, 2) && timeAt(times, 3)
+        && timeAt(times, 4) && timeAt(times, 5) && timeAt(times, 6) && timeAt(times, 7);
+    }
+    match /households/family/members/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+    match /households/family/children/{childId} {
+      allow read: if member();
+      allow update: if member() && request.resource.data.keys().hasOnly(['name', 'bearColor'])
+        && text(request.resource.data.name, 60)
+        && (!('bearColor' in request.resource.data)
+          || request.resource.data.bearColor in ['BLUE', 'ROSE', 'GREEN', 'HONEY', 'BROWN', 'PURPLE']);
+      allow create, delete: if false;
+    }
+    match /households/family/revisions/{revisionId} {
+      allow read: if member();
+      allow create: if member() && request.resource.data.keys().hasAll([
+          'taskId', 'childId', 'title', 'notes', 'frequency', 'weekdays', 'times', 'start', 'end', 'effective', 'active', 'authorId', 'createdAt'])
+        && request.resource.data.keys().hasOnly([
+          'taskId', 'childId', 'title', 'notes', 'frequency', 'weekdays', 'times', 'start', 'end', 'effective', 'active', 'authorId', 'createdAt'])
+        && text(request.resource.data.taskId, 100)
+        && request.resource.data.childId in ['ferdinand', 'johann', 'haushalt']
+        && text(request.resource.data.title, 120)
+        && request.resource.data.notes is string && request.resource.data.notes.size() <= 2000
+        && request.resource.data.frequency in ['ONCE', 'DAILY', 'WEEKDAYS']
+        && request.resource.data.weekdays is list
+        && request.resource.data.weekdays.size() <= 7
+        && request.resource.data.weekdays.hasOnly([1, 2, 3, 4, 5, 6, 7])
+        && (request.resource.data.frequency != 'WEEKDAYS' || request.resource.data.weekdays.size() > 0)
+        && validTimes(request.resource.data.times)
+        && date(request.resource.data.start) && date(request.resource.data.effective)
+        && (request.resource.data.end == null || (date(request.resource.data.end) && request.resource.data.end >= request.resource.data.start))
+        && request.resource.data.active is bool
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /households/family/events/{eventId} {
+      allow read: if member();
+      allow create: if member() && request.resource.data.keys().hasAll([
+          'occurrenceId', 'date', 'kind', 'authorId', 'authorName', 'clientMillis', 'createdAt', 'targetId'])
+        && request.resource.data.keys().hasOnly([
+          'occurrenceId', 'date', 'kind', 'authorId', 'authorName', 'clientMillis', 'createdAt', 'targetId'])
+        && text(request.resource.data.occurrenceId, 300) && date(request.resource.data.date)
+        && request.resource.data.authorId == request.auth.uid
+        && text(request.resource.data.authorName, 120)
+        && request.resource.data.clientMillis is int
+        && request.resource.data.createdAt == request.time
+        && ((request.resource.data.kind == 'COMPLETE' && request.resource.data.targetId == null)
+          || (request.resource.data.kind == 'RETRACT' && text(request.resource.data.targetId, 100)
+            && get(/databases/$(database)/documents/households/family/events/$(request.resource.data.targetId)).data.kind == 'COMPLETE'
+            && get(/databases/$(database)/documents/households/family/events/$(request.resource.data.targetId)).data.occurrenceId == request.resource.data.occurrenceId
+            && get(/databases/$(database)/documents/households/family/events/$(request.resource.data.targetId)).data.date == request.resource.data.date));
+      allow update, delete: if false;
+    }
+  }
+}
