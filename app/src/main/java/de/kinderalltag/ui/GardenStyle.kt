@@ -35,6 +35,7 @@ internal object GardenColors {
     val Ink = Color(0xFF333C38)
     val Blue = Color(0xFF166FA6)
     val Coral = Color(0xFFBF4658)
+    val Red = Color(0xFFB3261E)
     val Mustard = Color(0xFFE8B643)
     val Sage = Color(0xFF79A78B)
     val Green = Color(0xFF32664D)
@@ -44,7 +45,7 @@ internal object GardenColors {
     val Mint = Color(0xFFE4F0DB)
 }
 
-internal enum class GardenMotif { SUN, WORM, WATERING_CAN, SPROUT, RAKE, HOUSE }
+internal enum class GardenMotif { SUN, WORM, WATERING_CAN, SPROUT, RAKE, HOUSE, HEART }
 
 internal fun childColor(child: Child) = if (child.id == "haushalt") GardenColors.Green
     else when (child.bearColor) {
@@ -151,6 +152,17 @@ private fun DrawScope.drawMotif(motif: GardenMotif) {
             drawCircle(GardenColors.Burgundy, 2f, Offset(43f, 47f))
             drawCircle(GardenColors.Burgundy, 2f, Offset(57f, 47f))
             drawArc(GardenColors.Burgundy, 15f, 150f, false, Offset(42f, 49f), Size(16f, 12f), style = Stroke(2f))
+        }
+        GardenMotif.HEART -> {
+            drawPath(Path().apply {
+                moveTo(50f, 84f)
+                cubicTo(37f, 73f, 12f, 55f, 12f, 34f)
+                cubicTo(12f, 12f, 39f, 9f, 50f, 29f)
+                cubicTo(61f, 9f, 88f, 12f, 88f, 34f)
+                cubicTo(88f, 55f, 63f, 73f, 50f, 84f)
+                close()
+            }, GardenColors.Coral)
+            drawCircle(GardenColors.Cream.copy(alpha = 0.7f), 5f, Offset(29f, 30f))
         }
         GardenMotif.WORM -> {
             listOf(Offset(15f, 74f), Offset(29f, 69f), Offset(43f, 72f), Offset(57f, 62f), Offset(69f, 49f)).forEach {

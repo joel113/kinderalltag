@@ -1,0 +1,99 @@
+name: Android checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Format, lint, test and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'build-tools;36.1.0'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Test Git hooks
+        run: python3 -m unittest discover -s scripts/tests -v
+      # This intentionally uses the setup-screen build, without private Firebase/signing files.
+      - name: Format Kotlin sources and Gradle scripts
+        id: format
+        run: ./gradlew --no-daemon --stacktrace spotlessApply
+      - name: Lint, unit tests and debug APK
+        id: build
+        run: ./gradlew --no-daemon --stacktrace --continue spotlessCheck :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
+      - name: Require committed formatting and save patch
+        if: ${{ !cancelled() && steps.format.outcome == 'success' }}
+        run: |
+          mkdir -p build/reports
+          git diff --binary > build/reports/formatting.patch
+          if ! git diff --exit-code; then
+            echo '::error::Run ./gradlew spotlessApply and commit the formatting changes. The formatting patch is included in android-reports.'
+            exit 1
+          fi
+      - name: Upload reports and formatting patch
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+            build/reports/formatting.patch
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload debug APK
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: kinderalltag-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  firestore:
+    name: Firestore rules tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: firebase
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run rules tests against demo emulator only
+        run: npx --no-install firebase emulators:exec --config ../firebase.json --project demo-kinderalltag --only firestore 'npm test'
+      - name: Upload emulator diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: firestore-logs
+          path: firebase/*-debug.log
+          if-no-files-found: ignore
+          retention-days: 7

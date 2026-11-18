@@ -7,8 +7,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import de.kinderalltag.MainActivity
+import de.kinderalltag.KinderApplication
 import de.kinderalltag.R
-import de.kinderalltag.data.FamilyState
+import de.kinderalltag.data.*
 import de.kinderalltag.domain.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -17,6 +18,11 @@ import java.time.*
 object ReminderScheduler {
     const val CHANNEL = "care_reminders"
     private const val TICK = "calendar_refresh"
+    fun refresh(context: Context) {
+        (context.applicationContext as? KinderApplication)?.repository?.state?.value?.let { update(context, it) }
+    }
+    fun expiresAt(item: JSONObject): Long = item.optLong("expiresAt",
+        LocalDate.parse(item.getString("date")).plusDays(1).atStartOfDay(FAMILY_ZONE).toInstant().toEpochMilli())
     private fun prefs(context: Context) = context.getSharedPreferences("reminders", Context.MODE_PRIVATE)
     fun enabled(context: Context) = prefs(context).getBoolean("enabled", false)
     fun setEnabled(context: Context, enabled: Boolean) {
@@ -25,7 +31,7 @@ object ReminderScheduler {
     }
     fun createChannel(context: Context) {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "Aufgabenerinnerungen", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(CHANNEL, "Aufgaben & Termine", NotificationManager.IMPORTANCE_DEFAULT)
         )
     }
     private fun intent(context: Context, id: String): PendingIntent = PendingIntent.getBroadcast(
@@ -41,16 +47,16 @@ object ReminderScheduler {
             alarm.cancel(intent(context, id))
         }
         alarm.cancel(intent(context, TICK))
-        manager.cancelAll()
-        prefs(context).edit().remove("records").apply()
+        manager.activeNotifications.filter { it.notification.channelId == CHANNEL }.forEach { manager.cancel(it.tag, it.id) }
+        prefs(context).edit().remove("records").remove("deliveredAppointments").apply()
     }
     fun update(context: Context, state: FamilyState) {
         if (!enabled(context) || !state.loaded) return
         val now = Instant.now()
-        val children = state.sections.associate { it.id to it.name }
         val old = JSONArray(prefs(context).getString("records", "[]"))
         val oldIds = (0 until old.length()).map { old.getJSONObject(it).getString("id") }.toSet()
-        val upcoming = Schedule.reminders(state.revisions, state.events, now, oldIds)
+        val upcoming = FamilyReminders.plan(state.uid, state.sections, state.revisions, state.events,
+            state.appointments, state.appointmentExceptions, now, oldIds, operations = state.itemOperations, activity = state.appointmentActivity)
         val alarm = context.getSystemService(AlarmManager::class.java)
         val ids = upcoming.map { it.id }.toSet()
         for (i in 0 until old.length()) {
@@ -62,13 +68,33 @@ object ReminderScheduler {
             if (Schedule.activeCompletions(events, id).isNotEmpty())
                 context.getSystemService(NotificationManager::class.java).cancel(id, 0)
         }
+        context.getSystemService(NotificationManager::class.java).activeNotifications.filter {
+            it.notification.channelId == CHANNEL && it.tag?.startsWith("appointment_") != true
+        }.forEach { notification ->
+            val tag = notification.tag ?: return@forEach
+            val date = runCatching { LocalDate.parse(tag.substringBeforeLast('_').substringAfterLast('_')) }.getOrNull()
+            val occurrence = date?.let { day -> state.taskOccurrences(day).firstOrNull { it.id == tag } }
+            if (occurrence == null || occurrence.instant > now) context.getSystemService(NotificationManager::class.java).cancel(tag, notification.id)
+        }
         val records = JSONArray()
         upcoming.forEach { occurrence ->
-            records.put(JSONObject().put("id", occurrence.id).put("date", occurrence.date.toString())
-                .put("at", occurrence.instant.toEpochMilli())
-                .put("title", "${children[occurrence.revision.childId] ?: "Kind"}: ${occurrence.revision.title}"))
+            records.put(JSONObject().put("id", occurrence.id).put("date", occurrence.date)
+                .put("at", occurrence.at.toEpochMilli())
+                .put("title", occurrence.title).put("kind", occurrence.kind)
+                .put("expiresAt", occurrence.expiresAt.toEpochMilli()).put("fingerprint", occurrence.fingerprint))
         }
-        prefs(context).edit().putString("records", records.toString()).apply()
+        val delivered = JSONArray(prefs(context).getString("deliveredAppointments", "[]"))
+        val retained = JSONArray()
+        for (index in 0 until delivered.length()) {
+            val item = delivered.getJSONObject(index)
+            val date = LocalDate.parse(item.getString("date"))
+            val occurrence = state.appointmentOccurrences(date, date).firstOrNull { it.id == item.getString("id") }
+            if (occurrence != null && isResponsible(occurrence.details.responsibleParentId, state.uid) && occurrence.details.endInstant > now &&
+                occurrence.reminderFingerprint() == item.optString("fingerprint")) {
+                retained.put(item)
+            } else context.getSystemService(NotificationManager::class.java).cancel(item.getString("id"), 0)
+        }
+        prefs(context).edit().putString("records", records.toString()).putString("deliveredAppointments", retained.toString()).apply()
         restore(context)
     }
     fun restore(context: Context) {
@@ -77,7 +103,7 @@ object ReminderScheduler {
         val records = JSONArray(prefs(context).getString("records", "[]"))
         for (i in 0 until records.length()) {
             val item = records.getJSONObject(i)
-            if (item.getString("date") >= LocalDate.now(FAMILY_ZONE).toString()) alarm.setAndAllowWhileIdle(
+            if (expiresAt(item) > System.currentTimeMillis()) alarm.setAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP, maxOf(item.getLong("at"), System.currentTimeMillis() + 1000), intent(context, item.getString("id")))
         }
         val tomorrow = LocalDate.now(FAMILY_ZONE).plusDays(1).atTime(0, 1).atZone(FAMILY_ZONE)
@@ -93,6 +119,11 @@ object ReminderScheduler {
         for (index in 0 until records.length()) {
             val item = records.getJSONObject(index)
             if (item.getString("id") != id) remaining.put(item)
+            else if (item.optString("kind") == "appointment") {
+                val delivered = JSONArray(prefs(context).getString("deliveredAppointments", "[]"))
+                delivered.put(item)
+                prefs(context).edit().putString("deliveredAppointments", delivered.toString()).apply()
+            }
         }
         prefs(context).edit().putString("records", remaining.toString()).apply()
         context.getSystemService(AlarmManager::class.java).cancel(intent(context, id))
@@ -106,19 +137,20 @@ class ReminderReceiver : BroadcastReceiver() {
         val item = ReminderScheduler.record(context, id)
         ReminderScheduler.consume(context, id)
         ReminderScheduler.restore(context)
+        if (id == "calendar_refresh") ReminderScheduler.refresh(context)
         if (item == null) return
-        // Do not deliver yesterday's alarm after a long shutdown.
-        if (item.getString("date") != LocalDate.now(FAMILY_ZONE).toString()) return
+        if (ReminderScheduler.expiresAt(item) <= System.currentTimeMillis()) return
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED) return
         val open = Intent(context, MainActivity::class.java)
             .setData(Uri.parse("kinderalltag://occurrence/$id"))
             .putExtra("date", item.getString("date")).putExtra("occurrence", id)
+            .putExtra("kind", item.optString("kind", "task"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val tap = PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = Notification.Builder(context, ReminderScheduler.CHANNEL)
             .setSmallIcon(R.drawable.ic_notification).setContentTitle(item.getString("title"))
-            .setContentText("Aufgabe öffnen und gemeinsamen Status prüfen")
+            .setContentText(if (item.optString("kind") == "appointment") "Termin öffnen und Details prüfen" else "Aufgabe öffnen und gemeinsamen Status prüfen")
             .setVisibility(Notification.VISIBILITY_PRIVATE).setContentIntent(tap).setAutoCancel(true).build()
         context.getSystemService(NotificationManager::class.java).notify(id, 0, notification)
     }
@@ -127,7 +159,9 @@ class ReminderReceiver : BroadcastReceiver() {
 class RescheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action in setOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_TIME_CHANGED,
-                Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_MY_PACKAGE_REPLACED))
+                Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_MY_PACKAGE_REPLACED)) {
             ReminderScheduler.restore(context)
+            ReminderScheduler.refresh(context)
+        }
     }
 }

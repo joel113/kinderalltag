@@ -1,6 +1,8 @@
 package de.kinderalltag
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,6 +32,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (savedInstanceState == null) receiveCalendar(intent)
         setContent {
             KinderTheme {
                 val repository = (application as KinderApplication).repository
@@ -81,10 +84,31 @@ class MainActivity : ComponentActivity() {
                             scope.launch {
                                 runCatching { CredentialManager.create(this@MainActivity).clearCredentialState(ClearCredentialStateRequest()) }
                             }
-                        })
+                        }, initialPage = intent.getStringExtra("openPage"))
                 }
             }
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun receiveCalendar(incoming: Intent) {
+        val inbox = (application as KinderApplication).calendarInbox
+        try {
+            val uris: List<Uri> = when (incoming.action) {
+                Intent.ACTION_VIEW -> listOfNotNull(incoming.data)
+                Intent.ACTION_SEND -> listOfNotNull((incoming.getParcelableExtra<android.os.Parcelable>(Intent.EXTRA_STREAM) as? Uri)
+                    ?: incoming.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri)
+                Intent.ACTION_SEND_MULTIPLE -> incoming.getParcelableArrayListExtra<android.os.Parcelable>(Intent.EXTRA_STREAM)?.filterIsInstance<Uri>().orEmpty()
+                else -> return
+            }
+            val text = incoming.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+            inbox.receive(uris, text?.takeIf { uris.isEmpty() })
+        } catch (_: Exception) { inbox.reportError("Die geteilte Kalenderdatei konnte nicht geöffnet werden.") }
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        receiveCalendar(intent)
     }
 }
 

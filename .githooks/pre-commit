@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+git diff --cached --check
+
+# Docs/backend-only commits do not need an Android SDK or a full lint run.
+if git diff --cached --quiet -- app build.gradle.kts settings.gradle.kts gradle.properties gradle .editorconfig .githooks; then
+    exit 0
+fi
+
+# Formatting the full project must not rewrite partially staged or other unstaged app work.
+if ! git diff --quiet -- app build.gradle.kts settings.gradle.kts gradle.properties gradle .editorconfig; then
+    echo 'Pre-commit: stage or stash unstaged Android/build changes before formatting.' >&2
+    echo 'No files have been formatted or staged by this hook.' >&2
+    exit 1
+fi
+
+./gradlew --console=plain spotlessApply
+
+# Never auto-stage files: the author should review the formatter output before committing.
+if ! git diff --quiet -- app build.gradle.kts settings.gradle.kts gradle.properties gradle .editorconfig; then
+    echo 'Pre-commit: formatting updated files. Review and stage the changes, then commit again.' >&2
+    exit 1
+fi
+
+./gradlew --console=plain spotlessCheck :app:lintDebug

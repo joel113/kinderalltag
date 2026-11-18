@@ -11,6 +11,52 @@ class ScheduleTest {
     private fun completion(id: String, occurrence: Occurrence, kind: EventKind = EventKind.COMPLETE, target: String? = null) =
         CareEvent(id, occurrence.id, occurrence.date, kind, "parent", "Joel", 100, targetId = target)
 
+    @Test fun upcomingTasksIncludeDistantTasksAndExcludeEndedOrPausedTasks() {
+        val future = revision("future", "future").copy(frequency = Frequency.ONCE, start = monday.plusDays(200))
+        val ended = revision("ended", "ended").copy(end = monday.minusDays(1))
+        val pastOnce = revision("past", "past").copy(frequency = Frequency.ONCE, start = monday.minusDays(1))
+        val paused = revision("paused", "paused").copy(active = false)
+        assertEquals(listOf(future), Schedule.upcomingTasks(listOf(future, ended, pastOnce, paused), monday))
+    }
+    @Test fun upcomingTasksRespectWeekdaysAndTomorrowEffectiveChanges() {
+        val daily = revision()
+        val paused = daily.copy(id = "paused", effective = monday.plusDays(1), active = false)
+        val expiredWeekday = revision("weekly", "weekly").copy(frequency = Frequency.WEEKDAYS,
+            weekdays = setOf(DayOfWeek.FRIDAY), end = monday.plusDays(3))
+        val futureWeekday = expiredWeekday.copy(id = "later", taskId = "later", end = null)
+        assertEquals(listOf(futureWeekday), Schedule.upcomingTasks(listOf(daily, paused, expiredWeekday, futureWeekday), monday))
+    }
+    @Test fun taskPagesContainAtMostNinetyTasksWithoutGapsOrDuplicates() {
+        val all = (1..181).map { revision("r$it", "task$it") }
+        val first = taskPage(all, 0)
+        val second = taskPage(all, 1)
+        val last = taskPage(all, 2)
+        assertEquals(90, first.tasks.size)
+        assertEquals(1, first.first)
+        assertEquals(90, first.last)
+        assertTrue(first.hasNext)
+        assertEquals(91, second.first)
+        assertEquals(180, second.last)
+        assertEquals(1, last.tasks.size)
+        assertEquals(181, last.first)
+        assertEquals(181, last.last)
+        assertFalse(last.hasNext)
+        assertEquals(all, first.tasks + second.tasks + last.tasks)
+    }
+    @Test fun taskPagesHandleEmptyExactBoundaryAndStalePages() {
+        val empty = taskPage(emptyList(), 100)
+        assertEquals(0L, empty.index)
+        assertEquals(0, empty.first)
+        assertEquals(0, empty.last)
+        assertFalse(empty.hasNext)
+        val all = (1..90).map { revision("r$it", "task$it") }
+        val clamped = taskPage(all, 100)
+        assertEquals(0L, clamped.index)
+        assertEquals(all, clamped.tasks)
+        assertFalse(clamped.hasNext)
+        assertEquals(0L, taskPage(all, -1).index)
+    }
+
     @Test fun dailyCreatesIndependentDays() {
         val r = revision()
         val a = Schedule.occurrences(listOf(r), monday).single()
@@ -70,6 +116,16 @@ class ScheduleTest {
         val b = completion("b", occurrence).copy(authorId = "other", authorName = "Mama", pending = true)
         assertEquals(2, Schedule.activeCompletions(listOf(a, b), occurrence.id).size)
         assertEquals(1, Schedule.activeCompletions(listOf(a, b, completion("undo", occurrence, EventKind.RETRACT, "a")), occurrence.id).size)
+    }
+    @Test fun confirmationOnBehalfOfOtherParentPreservesAuthorAndCanBeRetracted() {
+        val occurrence = Schedule.occurrences(listOf(revision()), monday).single()
+        val credited = completion("credited", occurrence).copy(completedById = "other", completedByName = "Mama")
+        val active = Schedule.activeCompletions(listOf(credited), occurrence.id).single()
+        assertEquals(credited.authorId, active.authorId)
+        assertEquals("other", active.completedById)
+        assertEquals("Mama", active.completedByName)
+        val undo = completion("undo", occurrence, EventKind.RETRACT, credited.id)
+        assertTrue(Schedule.activeCompletions(listOf(credited, undo), occurrence.id).isEmpty())
     }
     @Test fun retractionTargetsOnlyItsAcknowledgementAndOccurrence() {
         val occurrence = Schedule.occurrences(listOf(revision()), monday).single()

@@ -6,6 +6,19 @@ service cloud.firestore {
     }
     function date(value) { return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
     function text(value, max) { return value is string && value.size() > 0 && value.size() <= max; }
+    function responsible(value) {
+      return value == null || (value is string && exists(/databases/$(database)/documents/households/family/members/$(value)));
+    }
+    function validDetails(d) {
+      return d is map && d.keys().hasAll(['title', 'recipient', 'date', 'startTime', 'endTime', 'allDay', 'responsibleParentId', 'location', 'notes', 'reminderMinutes'])
+        && d.keys().hasOnly(['title', 'recipient', 'date', 'startTime', 'endTime', 'allDay', 'responsibleParentId', 'location', 'notes', 'reminderMinutes'])
+        && text(d.title, 120) && d.recipient in ['FERDINAND', 'JOHANN', 'BOTH_CHILDREN', 'HOUSEHOLD']
+        && date(d.date) && validTimes([d.startTime]) && validTimes([d.endTime]) && d.allDay is bool
+        && (d.allDay || d.endTime > d.startTime) && responsible(d.responsibleParentId)
+        && d.location is string && d.location.size() <= 300 && d.notes is string && d.notes.size() <= 2000
+        && (d.reminderMinutes == null || (d.reminderMinutes is int &&
+          ((d.allDay && d.reminderMinutes in [0, 1440]) || (!d.allDay && d.reminderMinutes in [0, 15, 30, 60, 1440]))));
+    }
     function timeAt(times, index) {
       return times.size() <= index || (times[index] is string && times[index].matches('^([01][0-9]|2[0-3]):[0-5][0-9]$'));
     }
@@ -14,9 +27,41 @@ service cloud.firestore {
         && timeAt(times, 0) && timeAt(times, 1) && timeAt(times, 2) && timeAt(times, 3)
         && timeAt(times, 4) && timeAt(times, 5) && timeAt(times, 6) && timeAt(times, 7);
     }
+    function validTaskSnapshot(t) {
+      return t is map && t.keys().hasAll(['id', 'taskId', 'childId', 'title', 'notes', 'frequency', 'weekdays', 'times', 'start', 'end', 'effective', 'active', 'createdMillis', 'authorId', 'responsibleParentId', 'slotOrigins'])
+        && t.keys().hasOnly(['id', 'taskId', 'childId', 'title', 'notes', 'frequency', 'weekdays', 'times', 'start', 'end', 'effective', 'active', 'createdMillis', 'authorId', 'responsibleParentId', 'slotOrigins'])
+        && text(t.id, 100) && text(t.taskId, 100) && t.childId in ['ferdinand', 'johann', 'haushalt']
+        && text(t.title, 120) && t.notes is string && t.notes.size() <= 2000
+        && t.frequency in ['ONCE', 'DAILY', 'WEEKDAYS'] && t.weekdays is list && t.weekdays.size() <= 7
+        && t.weekdays.hasOnly([1, 2, 3, 4, 5, 6, 7]) && (t.frequency != 'WEEKDAYS' || t.weekdays.size() > 0)
+        && validTimes(t.times) && date(t.start) && date(t.effective) && (t.end == null || (date(t.end) && t.end >= t.start))
+        && t.active is bool && t.createdMillis is int && t.authorId is string && responsible(t.responsibleParentId)
+        && t.slotOrigins is list && (t.slotOrigins.size() == 0 || t.slotOrigins.size() == t.times.size())
+        && originAt(t.slotOrigins, 0) && originAt(t.slotOrigins, 1) && originAt(t.slotOrigins, 2) && originAt(t.slotOrigins, 3)
+        && originAt(t.slotOrigins, 4) && originAt(t.slotOrigins, 5) && originAt(t.slotOrigins, 6) && originAt(t.slotOrigins, 7);
+    }
+    function originAt(values, index) {
+      return values.size() <= index || (values[index] is string && values[index].size() <= 120
+        && values[index].matches('^[^|]+[|]([0-7]?[0-9]{1,4}|8[0-5][0-9]{3}|86[0-3][0-9]{2})$'));
+    }
+    function validOccurrenceSnapshot(s, event) {
+      return s is map && s.keys().hasAll(['revision', 'date', 'time', 'id', 'originalDate', 'originalTime', 'sourceId'])
+        && s.keys().hasOnly(['revision', 'date', 'time', 'id', 'originalDate', 'originalTime', 'sourceId'])
+        && validTaskSnapshot(s.revision) && s.id == event.occurrenceId && s.date == event.date
+        && validTimes([s.time]) && date(s.originalDate) && validTimes([s.originalTime]) && text(s.sourceId, 100)
+        && get(/databases/$(database)/documents/households/family/revisions/$(s.sourceId)).data.taskId == s.revision.taskId;
+    }
+    function validAppointmentSnapshot(a) {
+      return a is map && a.keys().hasAll(['id', 'details', 'repeat', 'interval', 'until', 'fromDate'])
+        && a.keys().hasOnly(['id', 'details', 'repeat', 'interval', 'until', 'fromDate'])
+        && text(a.id, 100) && validDetails(a.details) && a.repeat in ['ONCE', 'DAYS', 'WEEKS', 'MONTHS', 'YEARS']
+        && a.interval is int && a.interval >= 1 && a.interval <= 1000 && (a.repeat != 'ONCE' || a.interval == 1)
+        && date(a.fromDate) && a.fromDate >= a.details.date && (a.until == null || (date(a.until) && a.until >= a.fromDate));
+    }
     match /households/family/members/{uid} {
-      allow get: if request.auth != null && request.auth.uid == uid;
-      allow list, write: if false;
+      allow get: if request.auth != null && (request.auth.uid == uid || member());
+      allow list: if member();
+      allow write: if false;
     }
     match /households/family/children/{childId} {
       allow read: if member();
@@ -31,8 +76,9 @@ service cloud.firestore {
       allow create: if member() && request.resource.data.keys().hasAll([
           'taskId', 'childId', 'title', 'notes', 'frequency', 'weekdays', 'times', 'start', 'end', 'effective', 'active', 'authorId', 'createdAt'])
         && request.resource.data.keys().hasOnly([
-          'taskId', 'childId', 'title', 'notes', 'frequency', 'weekdays', 'times', 'start', 'end', 'effective', 'active', 'authorId', 'createdAt'])
+          'taskId', 'childId', 'title', 'notes', 'frequency', 'weekdays', 'times', 'start', 'end', 'effective', 'active', 'authorId', 'createdAt', 'responsibleParentId'])
         && text(request.resource.data.taskId, 100)
+        && (!('responsibleParentId' in request.resource.data) || responsible(request.resource.data.responsibleParentId))
         && request.resource.data.childId in ['ferdinand', 'johann', 'haushalt']
         && text(request.resource.data.title, 120)
         && request.resource.data.notes is string && request.resource.data.notes.size() <= 2000
@@ -54,7 +100,14 @@ service cloud.firestore {
       allow create: if member() && request.resource.data.keys().hasAll([
           'occurrenceId', 'date', 'kind', 'authorId', 'authorName', 'clientMillis', 'createdAt', 'targetId'])
         && request.resource.data.keys().hasOnly([
-          'occurrenceId', 'date', 'kind', 'authorId', 'authorName', 'clientMillis', 'createdAt', 'targetId'])
+          'occurrenceId', 'date', 'kind', 'authorId', 'authorName', 'clientMillis', 'createdAt', 'targetId', 'completedById', 'completedByName', 'taskSnapshot'])
+        && ((!('completedById' in request.resource.data) && !('completedByName' in request.resource.data))
+          || (request.resource.data.kind == 'COMPLETE'
+            && request.resource.data.keys().hasAll(['completedById', 'completedByName'])
+            && request.resource.data.completedById is string
+            && responsible(request.resource.data.completedById)
+            && text(request.resource.data.completedByName, 120)))
+        && (!('taskSnapshot' in request.resource.data) || validOccurrenceSnapshot(request.resource.data.taskSnapshot, request.resource.data))
         && text(request.resource.data.occurrenceId, 300) && date(request.resource.data.date)
         && request.resource.data.authorId == request.auth.uid
         && text(request.resource.data.authorName, 120)
@@ -65,6 +118,136 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/households/family/events/$(request.resource.data.targetId)).data.kind == 'COMPLETE'
             && get(/databases/$(database)/documents/households/family/events/$(request.resource.data.targetId)).data.occurrenceId == request.resource.data.occurrenceId
             && get(/databases/$(database)/documents/households/family/events/$(request.resource.data.targetId)).data.date == request.resource.data.date));
+      allow update, delete: if false;
+    }
+    match /households/family/appointmentSeries/{seriesId} {
+      allow read: if member();
+      allow create: if member()
+        && request.resource.data.keys().hasAll(['details', 'repeat', 'interval', 'until', 'cutoff', 'version', 'authorId', 'createdAt', 'fromDate'])
+        && request.resource.data.keys().hasOnly(['details', 'repeat', 'interval', 'until', 'cutoff', 'version', 'authorId', 'createdAt', 'fromDate', 'rootId'])
+        && (!('rootId' in request.resource.data) || (text(request.resource.data.rootId, 100)
+          && (request.resource.data.rootId == seriesId || exists(/databases/$(database)/documents/households/family/appointmentSeries/$(request.resource.data.rootId)))))
+        && validDetails(request.resource.data.details)
+        && request.resource.data.repeat in ['ONCE', 'DAYS', 'WEEKS', 'MONTHS', 'YEARS']
+        && request.resource.data.interval is int && request.resource.data.interval >= 1 && request.resource.data.interval <= 1000
+        && (request.resource.data.repeat != 'ONCE' || request.resource.data.interval == 1)
+        && date(request.resource.data.fromDate) && request.resource.data.fromDate >= request.resource.data.details.date
+        && (request.resource.data.repeat != 'ONCE' || request.resource.data.fromDate == request.resource.data.details.date)
+        && (request.resource.data.until == null || (date(request.resource.data.until) && request.resource.data.until >= request.resource.data.fromDate))
+        && request.resource.data.cutoff == null && request.resource.data.version is int && request.resource.data.version == 0
+        && request.resource.data.authorId == request.auth.uid && request.resource.data.createdAt == request.time;
+      // Definitions are preserved. Only the exclusive future boundary can be shortened.
+      allow update: if member() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cutoff', 'version'])
+        && date(request.resource.data.cutoff) && (resource.data.cutoff == null || request.resource.data.cutoff < resource.data.cutoff)
+        && request.resource.data.version is int && request.resource.data.version == resource.data.version + 1;
+      allow delete: if false;
+    }
+    match /households/family/appointmentActivity/{activityId} {
+      function changedSeries(d) {
+        let before = get(/databases/$(database)/documents/households/family/appointmentSeries/$(d.seriesId)).data;
+        let after = getAfter(/databases/$(database)/documents/households/family/appointmentSeries/$(d.seriesId)).data;
+        return after.cutoff == d.originalDate && after.version == before.version + 1
+          && ((d.kind == 'CANCELLED' && d.resultSeriesId == null)
+            || (d.kind == 'CHANGED' && d.resultSeriesId is string
+              && getAfter(/databases/$(database)/documents/households/family/appointmentSeries/$(d.resultSeriesId)).data.createdAt == request.time
+              && getAfter(/databases/$(database)/documents/households/family/appointmentSeries/$(d.resultSeriesId)).data.authorId == request.auth.uid
+              && getAfter(/databases/$(database)/documents/households/family/appointmentSeries/$(d.resultSeriesId)).data.details == d.details));
+      }
+      function changedOccurrence(d) {
+        let key = d.seriesId + '_' + d.originalDate;
+        let after = getAfter(/databases/$(database)/documents/households/family/appointmentExceptions/$(key)).data;
+        return d.resultSeriesId == null && after.updatedAt == request.time && after.authorId == request.auth.uid
+          && ((d.kind == 'CANCELLED' && after.replacement == null)
+            || (d.kind == 'CHANGED' && after.replacement == d.details));
+      }
+      function addedSeries(d) {
+        let after = getAfter(/databases/$(database)/documents/households/family/appointmentSeries/$(d.seriesId)).data;
+        return !d.following && d.resultSeriesId == null && after.createdAt == request.time
+          && after.authorId == request.auth.uid && after.fromDate == d.originalDate && after.details == d.details;
+      }
+      allow read: if member();
+      allow create: if member()
+        && request.resource.data.keys().hasAll(['seriesId', 'originalDate', 'kind', 'following', 'details', 'resultSeriesId', 'authorId', 'authorName', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['seriesId', 'originalDate', 'kind', 'following', 'details', 'resultSeriesId', 'authorId', 'authorName', 'createdAt'])
+        && text(request.resource.data.seriesId, 100) && date(request.resource.data.originalDate)
+        && request.resource.data.kind in ['ADDED', 'CHANGED', 'CANCELLED']
+        && request.resource.data.following is bool && validDetails(request.resource.data.details)
+        && (request.resource.data.resultSeriesId == null || text(request.resource.data.resultSeriesId, 100))
+        && request.resource.data.authorId == request.auth.uid && text(request.resource.data.authorName, 120)
+        && request.resource.data.createdAt == request.time
+        && ((request.resource.data.kind == 'ADDED' && addedSeries(request.resource.data))
+          || (request.resource.data.kind != 'ADDED'
+            && ((request.resource.data.following && changedSeries(request.resource.data))
+              || (!request.resource.data.following && changedOccurrence(request.resource.data)))));
+      allow update, delete: if false;
+    }
+    match /households/family/appointmentExceptions/{exceptionId} {
+      function validException() {
+        let d = request.resource.data;
+        let series = get(/databases/$(database)/documents/households/family/appointmentSeries/$(d.seriesId)).data;
+        return d.keys().hasAll(['seriesId', 'originalDate', 'replacement', 'version', 'seriesVersion', 'authorId', 'updatedAt'])
+          && d.keys().hasOnly(['seriesId', 'originalDate', 'replacement', 'version', 'seriesVersion', 'authorId', 'updatedAt'])
+          && text(d.seriesId, 100) && date(d.originalDate) && exceptionId == d.seriesId + '_' + d.originalDate
+          && d.originalDate >= series.fromDate && (series.until == null || d.originalDate <= series.until)
+          && (series.cutoff == null || d.originalDate < series.cutoff)
+          && (d.replacement == null || validDetails(d.replacement))
+          && d.seriesVersion == series.version && d.version is int
+          && d.authorId == request.auth.uid && d.updatedAt == request.time;
+      }
+      allow read: if member();
+      allow create: if member() && validException() && request.resource.data.version == 0;
+      allow update: if member() && validException()
+        && request.resource.data.seriesId == resource.data.seriesId && request.resource.data.originalDate == resource.data.originalDate
+        && request.resource.data.version == resource.data.version + 1;
+      allow delete: if false;
+    }
+    match /households/family/itemControls/{controlId} {
+      function validControl() {
+        let d = request.resource.data;
+        let op = getAfter(/databases/$(database)/documents/households/family/itemOperations/$(d.operationId)).data;
+        return d.keys().hasAll(['version', 'operationId', 'authorId', 'updatedAt'])
+          && d.keys().hasOnly(['version', 'operationId', 'authorId', 'updatedAt'])
+          && text(d.operationId, 100) && d.authorId == request.auth.uid && d.updatedAt == request.time
+          && d.version is int && op.version == d.version && op.authorId == request.auth.uid && op.createdAt == request.time
+          && controlId == op.type + '_' + op.itemId;
+      }
+      allow read: if member();
+      allow create: if member() && validControl() && request.resource.data.version == 1;
+      allow update: if member() && validControl() && request.resource.data.version == resource.data.version + 1;
+      allow delete: if false;
+    }
+    match /households/family/itemOperations/{operationId} {
+      function validOperation() {
+        let d = request.resource.data;
+        let key = d.type + '_' + d.itemId;
+        let control = getAfter(/databases/$(database)/documents/households/family/itemControls/$(key)).data;
+        return d.keys().hasAll(['type', 'itemId', 'action', 'scope', 'anchorId', 'anchorDate', 'anchorTime', 'sourceId', 'title', 'actualDate', 'actualStartAt', 'replacementStartAt', 'childId', 'recipient', 'task', 'appointment', 'restoresId', 'createdAt', 'authorId', 'authorName', 'version'])
+          && d.keys().hasOnly(['type', 'itemId', 'action', 'scope', 'anchorId', 'anchorDate', 'anchorTime', 'sourceId', 'title', 'actualDate', 'actualStartAt', 'replacementStartAt', 'childId', 'recipient', 'task', 'appointment', 'restoresId', 'createdAt', 'authorId', 'authorName', 'version'])
+          && d.type in ['TASK', 'APPOINTMENT'] && text(d.itemId, 100) && text(d.sourceId, 100)
+          && d.action in ['EDIT', 'DELETE', 'RESTORE'] && d.scope in ['SINGLE', 'FOLLOWING', 'ALL']
+          && text(d.anchorId, 300) && date(d.anchorDate) && validTimes([d.anchorTime]) && text(d.title, 120)
+          && date(d.actualDate) && d.actualStartAt is timestamp && (d.replacementStartAt == null || d.replacementStartAt is timestamp)
+          && d.authorId == request.auth.uid && text(d.authorName, 120) && d.createdAt == request.time
+          && d.version is int && control.version == d.version && control.operationId == operationId
+          && control.updatedAt == request.time && control.authorId == request.auth.uid
+          && ((d.type == 'TASK' && d.childId in ['ferdinand', 'johann', 'haushalt'] && d.recipient == null
+              && get(/databases/$(database)/documents/households/family/revisions/$(d.sourceId)).data.taskId == d.itemId)
+            || (d.type == 'APPOINTMENT' && d.childId == null && d.recipient in ['FERDINAND', 'JOHANN', 'BOTH_CHILDREN', 'HOUSEHOLD']
+              && exists(/databases/$(database)/documents/households/family/appointmentSeries/$(d.sourceId))))
+          && ((d.action == 'EDIT' && d.scope in ['SINGLE', 'FOLLOWING'] && d.restoresId == null && d.actualStartAt > request.time
+              && ((d.type == 'TASK' && validTaskSnapshot(d.task) && d.task.taskId == d.itemId && d.appointment == null
+                  && (d.scope != 'SINGLE' || (d.task.times.size() == 1 && d.replacementStartAt > request.time)))
+                || (d.type == 'APPOINTMENT' && d.task == null && validAppointmentSnapshot(d.appointment) && d.replacementStartAt > request.time)))
+            || (d.action == 'DELETE' && d.task == null && d.appointment == null && d.restoresId == null)
+            || (d.action == 'RESTORE' && d.task == null && d.appointment == null && text(d.restoresId, 100)
+              && get(/databases/$(database)/documents/households/family/itemOperations/$(d.restoresId)).data.action == 'DELETE'
+              && get(/databases/$(database)/documents/households/family/itemOperations/$(d.restoresId)).data.itemId == d.itemId
+              && get(/databases/$(database)/documents/households/family/itemOperations/$(d.restoresId)).data.type == d.type
+              && get(/databases/$(database)/documents/households/family/itemOperations/$(d.restoresId)).data.scope == d.scope
+              && get(/databases/$(database)/documents/households/family/itemOperations/$(d.restoresId)).data.anchorId == d.anchorId));
+      }
+      allow read: if member();
+      allow create: if member() && validOperation();
       allow update, delete: if false;
     }
   }

@@ -18,6 +18,9 @@ enum class BearColor(val argb: Long) {
 data class Child(val id: String, val name: String,
     val bearColor: BearColor = BearColor.fromStored(null, id))
 val HOUSEHOLD_SECTION = Child("haushalt", "Haushalt")
+data class Parent(val id: String, val name: String)
+fun isResponsible(assignedParentId: String?, uid: String?): Boolean =
+    uid != null && (assignedParentId == null || assignedParentId == uid)
 
 data class TaskRevision(
     val id: String,
@@ -34,6 +37,8 @@ data class TaskRevision(
     val active: Boolean = true,
     val createdMillis: Long = 0,
     val authorId: String = "",
+    val responsibleParentId: String? = null,
+    val slotOrigins: List<String> = emptyList(),
 ) {
     fun validate() {
         require(taskId.isNotBlank() && childId.isNotBlank()) { "Bitte ein Kind auswählen." }
@@ -54,8 +59,10 @@ data class TaskRevision(
         }
 }
 
-data class Occurrence(val revision: TaskRevision, val date: LocalDate, val time: LocalTime) {
-    val id: String get() = "${revision.taskId}_${revision.id}_${date}_${time.toSecondOfDay()}"
+data class Occurrence(val revision: TaskRevision, val date: LocalDate, val time: LocalTime,
+    val stableId: String? = null, val originalDate: LocalDate = date, val originalTime: LocalTime = time,
+    val sourceRevisionId: String = revision.id) {
+    val id: String get() = stableId ?: "${revision.taskId}_${revision.id}_${date}_${time.toSecondOfDay()}"
     // java.time resolves spring gaps forward and autumn overlaps to the earlier offset.
     val instant: Instant get() = date.atTime(time).atZone(FAMILY_ZONE).toInstant()
 }
@@ -72,6 +79,9 @@ data class CareEvent(
     val serverMillis: Long? = null,
     val targetId: String? = null,
     val pending: Boolean = false,
+    val completedById: String? = null,
+    val completedByName: String? = null,
+    val taskSnapshot: Occurrence? = null,
 )
 
 object Schedule {
@@ -95,10 +105,33 @@ object Schedule {
             .flatMap { revision -> revision.times.map { Occurrence(revision, date, it) } }
             .sortedWith(compareBy<Occurrence> { it.time }.thenBy { it.revision.title })
 
+    fun upcomingTasks(revisions: List<TaskRevision>, today: LocalDate): List<TaskRevision> =
+        revisionsOn(revisions, today.plusDays(1)).filter { task ->
+            val first = maxOf(today, task.start, task.effective)
+            task.active && when (task.frequency) {
+                Frequency.ONCE -> task.start >= first && task.isDue(task.start)
+                Frequency.DAILY -> task.isDue(first)
+                Frequency.WEEKDAYS -> (0L..6L).any { task.isDue(first.plusDays(it)) }
+            }
+        }
+
     fun activeCompletions(events: List<CareEvent>, occurrenceId: String): List<CareEvent> {
         val relevant = events.filter { it.occurrenceId == occurrenceId }
         val retracted = relevant.filter { it.kind == EventKind.RETRACT }.mapNotNull { it.targetId }.toSet()
         return relevant.filter { it.kind == EventKind.COMPLETE && it.id !in retracted }
             .sortedWith(compareBy<CareEvent> { it.serverMillis ?: it.clientMillis }.thenBy { it.id })
     }
+}
+
+// Clamp stale pages after filtering or a synchronized task change.
+data class TaskPage(val tasks: List<TaskRevision>, val index: Long, val total: Int) {
+    val first: Int get() = if (total == 0) 0 else (index * 90).toInt() + 1
+    val last: Int get() = if (total == 0) 0 else first + tasks.size - 1
+    val hasNext: Boolean get() = last < total
+}
+
+fun taskPage(tasks: List<TaskRevision>, requestedPage: Long): TaskPage {
+    val lastPage = if (tasks.isEmpty()) 0L else (tasks.size - 1).toLong() / 90
+    val page = requestedPage.coerceIn(0L, lastPage)
+    return TaskPage(tasks.drop((page * 90).toInt()).take(90), page, tasks.size)
 }
