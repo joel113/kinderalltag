@@ -139,13 +139,15 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
     val busy by vm.busy.collectAsStateWithLifecycle()
     val error by vm.operationError.collectAsStateWithLifecycle()
     var restoring by remember { mutableStateOf<ItemOperation?>(null) }
+    val listError by vm.listError.collectAsStateWithLifecycle()
+    var restoringList by remember { mutableStateOf<FamilyListItem?>(null) }
     LaunchedEffect(Unit) { vm.operationError.value = null }
     val deleted = activeDeletions(state.itemOperations).sortedByDescending { it.createdMillis }
     androidx.compose.foundation.lazy.LazyColumn(contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 80.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Papierkorb", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
         item { Text("Gelöschte Ausführungen und Reihen. Bestätigungen, Verlauf und Statistiken bleiben erhalten.") }
-        if (deleted.isEmpty()) item { Text("Hier ist noch nichts im Papierkorb.") }
+        if (deleted.isEmpty() && state.listItems.none { it.deleted }) item { Text("Hier ist noch nichts im Papierkorb.") }
         error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         items(deleted, key = { it.id }) { item ->
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = GardenColors.Cream)) {
@@ -160,7 +162,24 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
                 }
             }
         }
+        items(state.listItems.filter { it.deleted }, key = { "list:${it.id}" }) { item ->
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = GardenColors.Cream)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(item.title, fontWeight = FontWeight.Bold)
+                    Text(listTitle(item.kind))
+                    OutlinedButton(enabled = !busy && !state.fromCache && !state.pending && state.error == null,
+                        onClick = { vm.listError.value = null; restoringList = item }) { Text("Wiederherstellen") }
+                }
+            }
+        }
         item { EndOfPageFooter(GardenMotif.SPROUT) }
+    }
+    restoringList?.let { item ->
+        AlertDialog(onDismissRequest = { if (!busy) restoringList = null }, title = { Text("Wiederherstellen?") },
+            text = { Column { Text("„${item.title}“ wird mit seinem aktuellen Kaufstatus wieder sichtbar."); listError?.let { Text(it, color = GardenColors.Red) } } },
+            confirmButton = { TextButton(enabled = !busy && !state.fromCache && !state.pending, onClick = {
+                vm.changeListItem(item, ListAction.RESTORED) { restoringList = null }
+            }) { Text("Wiederherstellen") } }, dismissButton = { TextButton(enabled = !busy, onClick = { restoringList = null }) { Text("Abbrechen") } })
     }
     restoring?.let { deletion ->
         AlertDialog(onDismissRequest = { if (!busy) restoring = null }, title = { Text("Wiederherstellen?") },

@@ -14,7 +14,11 @@ Open this directory in Android Studio, select JDK 17 or 21 for Gradle, and insta
 
 Without `app/google-services.json`, the app builds into a setup screen. With configuration it supports:
 
-- Shared today view, grouped by child, with completion details.
+- Shared today view, grouped by child, with completion details and the current shopping list.
+- Undated shopping and gift lists, configurable labels and offline purchase checkboxes.
+- Gift ideas for either child or both, with occasion and giver labels.
+- German voice dictation for titles/notes and reviewed multi-item shopping imports.
+- Optional live notifications when the other parent completes a task.
 - One-off, daily, selected weekday and multiple-time schedules.
 - History by date and child, including late acknowledgements and corrections.
 - Offline acknowledgements with visible pending synchronization.

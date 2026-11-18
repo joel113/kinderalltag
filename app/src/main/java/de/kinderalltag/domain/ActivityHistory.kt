@@ -17,6 +17,7 @@ data class AppointmentActivity(
 )
 
 enum class HistoryKind {
+    SHOPPING_ADDED, SHOPPING_CHANGED, SHOPPING_BOUGHT, SHOPPING_REOPENED, SHOPPING_DELETED, SHOPPING_RESTORED, GIFT_ADDED, GIFT_CHANGED, GIFT_BOUGHT, GIFT_REOPENED, GIFT_DELETED, GIFT_RESTORED,
     TASK_COMPLETED, TASK_CORRECTED, TASK_UPDATED,
     APPOINTMENT_ADDED, APPOINTMENT_CHANGED, APPOINTMENT_CANCELLED,
     TASK_DELETED, TASK_RESTORED, APPOINTMENT_DELETED, APPOINTMENT_RESTORED,
@@ -38,6 +39,8 @@ data class HistoryEntry(
     val legacy: Boolean = false,
     val kind: HistoryKind,
     val operationScope: OperationScope? = null,
+    val listKind: FamilyListKind? = null,
+    val labels: List<String> = emptyList(),
 )
 
 data class HistoryPeriod(val from: LocalDate, val to: LocalDate)
@@ -49,7 +52,7 @@ fun historyPeriod(today: LocalDate, page: Long): HistoryPeriod {
 
 fun activityHistory(revisions: List<TaskRevision>, events: List<CareEvent>, series: List<AppointmentSeries>,
     exceptions: List<AppointmentException>, activity: List<AppointmentActivity>, parents: List<Parent>,
-    period: HistoryPeriod, sectionId: String? = null, onlyMine: Boolean = false, uid: String? = null, operations: List<ItemOperation> = emptyList()): List<HistoryEntry> {
+    period: HistoryPeriod, sectionId: String? = null, onlyMine: Boolean = false, uid: String? = null, operations: List<ItemOperation> = emptyList(), listActivity: List<ListActivity> = emptyList()): List<HistoryEntry> {
     fun name(id: String) = parents.firstOrNull { it.id == id }?.name ?: "Elternteil"
     val entries = mutableListOf<HistoryEntry>()
     events.forEach { event ->
@@ -124,11 +127,28 @@ fun activityHistory(revisions: List<TaskRevision>, events: List<CareEvent>, seri
             operation.authorId, operation.authorName, childId = operation.childId, recipient = operation.recipient,
             subjectDate = operation.actualDate, kind = kind, operationScope = operation.scope)
     }
+    listActivity.forEach { event ->
+        val item = event.snapshot
+        val prefix = if (item.kind == FamilyListKind.SHOPPING) "Einkauf" else "Geschenkidee"
+        val action = when (event.action) {
+            ListAction.ADDED -> "angelegt"
+            ListAction.CHANGED -> "geändert"
+            ListAction.BOUGHT -> "gekauft"
+            ListAction.REOPENED -> "wieder geöffnet"
+            ListAction.DELETED -> "gelöscht"
+            ListAction.RESTORED -> "wiederhergestellt"
+        }
+        entries += HistoryEntry("list-event:${event.id}", event.millis, "$prefix $action", item.title,
+            event.authorId, event.authorName, recipient = item.recipient, pending = event.pending,
+            kind = HistoryKind.valueOf("${if (item.kind == FamilyListKind.SHOPPING) "SHOPPING" else "GIFT"}_${event.action.name}"),
+            listKind = item.kind, labels = event.labels.map { it.name })
+    }
     val start = period.from.atStartOfDay(FAMILY_ZONE).toInstant().toEpochMilli()
     val end = period.to.plusDays(1).atStartOfDay(FAMILY_ZONE).toInstant().toEpochMilli()
     return entries.filter { entry ->
         entry.millis in start until end &&
-            (sectionId == null || entry.childId == sectionId || entry.recipient?.matches(sectionId) == true) &&
+            (sectionId == null || entry.childId == sectionId || entry.recipient?.matches(sectionId) == true ||
+                (sectionId == "haushalt" && entry.listKind == FamilyListKind.SHOPPING)) &&
             (!onlyMine || (uid != null && (entry.authorId == uid || entry.creditedId == uid)))
     }.sortedWith(compareByDescending<HistoryEntry> { it.millis }.thenBy { it.id })
 }

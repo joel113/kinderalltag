@@ -95,14 +95,14 @@ internal data class TaskOverviewSelection(val task: TaskRevision, val editable: 
     val date: LocalDate?, val historical: Boolean, val version: Long)
 
 @Composable
-internal fun TaskDefinitionDialog(selection: TaskOverviewSelection, state: FamilyState, busy: Boolean,
+internal fun TaskDefinitionDialog(selection: TaskOverviewSelection, state: FamilyState, busy: Boolean, now: Instant,
     onDismiss: () -> Unit, onEdit: () -> Unit, onPause: () -> Unit, onDelete: () -> Unit) {
     val task = selection.task
     val formats = rememberDateTimeFormats()
     val current = state.version(ItemType.TASK, task.taskId) == selection.version &&
         activeDeletions(state.itemOperations).none { it.type == ItemType.TASK && it.itemId == task.taskId && it.scope == OperationScope.ALL }
     val canManage = current && !busy && !state.fromCache && state.error == null
-    val upcoming = if (!selection.historical && task.active) state.futureTaskOccurrences(task.taskId, Instant.now()).firstOrNull() else null
+    val upcoming = if (!selection.historical && task.active) state.futureTaskOccurrences(task.taskId, now).firstOrNull() else null
     ItemDetailsDialog(task.title, "Aufgabe", onDismiss, busy, actions = {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!selection.historical) {
@@ -128,6 +128,7 @@ internal fun TaskDefinitionDialog(selection: TaskOverviewSelection, state: Famil
             DetailValue(Icons.Default.Person, "Zuständig", responsibilityName(task.responsibleParentId, state.parents))
             if (upcoming != null) DetailValue(Icons.Default.Event, "Nächste Ausführung", "${formats.fullDate(upcoming.date)} · ${formats.time(upcoming.time)}")
         }
+        TaskCompletionOverview(task.taskId, state, now, selection.date)
         if (task.notes.isNotBlank()) DetailSection("Notizen", GardenColors.Cream) { Text(task.notes) }
         if (!selection.editable.active) DetailNotice("Diese Aufgabe ist pausiert. Mit Fortsetzen wählt ihr die nächste Ausführung.")
         else if (selection.historical) DetailNotice("Vergangene Ausführungen bleiben unverändert. Ihr könnt sie löschen und im Papierkorb wiederherstellen.")

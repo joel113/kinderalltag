@@ -11,6 +11,9 @@ private fun sourceLabel(source: String): String = when (source) {
     "appointmentExceptions" -> "Terminänderungen"
     "appointmentActivity" -> "Terminverlauf"
     "itemOperations" -> "Änderungen & Papierkorb"
+    "listItems" -> "Einkäufe & Geschenkideen"
+    "listActivity" -> "Listenverlauf"
+    "listLabels" -> "Listenlabels"
     "membership" -> "Familienzugang"
     else -> source
 }

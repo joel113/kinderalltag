@@ -24,6 +24,9 @@ data class FamilyState(
     val revisions: List<TaskRevision> = emptyList(),
     val events: List<CareEvent> = emptyList(),
     val itemOperations: List<ItemOperation> = emptyList(),
+    val listItems: List<FamilyListItem> = emptyList(),
+    val listActivity: List<ListActivity> = emptyList(),
+    val listLabels: List<FamilyLabel> = emptyList(),
     val fromCache: Boolean = true,
     val pending: Boolean = false,
     val error: String? = null,
@@ -32,12 +35,13 @@ data class FamilyState(
         get() = children.filterNot { it.id == HOUSEHOLD_SECTION.id } + HOUSEHOLD_SECTION
 }
 
-private val DATA_COLLECTIONS = setOf("children", "revisions", "events", "members", "appointmentSeries", "appointmentExceptions", "appointmentActivity", "itemOperations")
+private val DATA_COLLECTIONS = setOf("children", "revisions", "events", "members", "appointmentSeries", "appointmentExceptions", "appointmentActivity", "itemOperations", "listItems", "listActivity", "listLabels")
 
 class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseFirestore) {
     private val mutable = MutableStateFlow(FamilyState(uid = auth.currentUser?.uid,
         name = auth.currentUser?.displayName ?: "Elternteil"))
     val state = mutable.asStateFlow()
+    val lists = FamilyLists(auth, db) { mutable.value }
     private val household = db.collection("households").document("family")
     private var membership: ListenerRegistration? = null
     private val listeners = mutableListOf<ListenerRegistration>()
@@ -99,6 +103,9 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                 observeCollection("appointmentActivity") { snapshot ->
                     mutable.value = mutable.value.copy(appointmentActivity = snapshot.documents.map(::decodeAppointmentActivity))
                 }
+                observeCollection("listItems") { snapshot -> mutable.value = mutable.value.copy(listItems = snapshot.documents.map { decodeListItem(requireNotNull(it.data)) }) }
+                observeCollection("listLabels") { snapshot -> mutable.value = mutable.value.copy(listLabels = snapshot.documents.map { decodeLabel(requireNotNull(it.data)) }) }
+                observeCollection("listActivity") { snapshot -> mutable.value = mutable.value.copy(listActivity = snapshot.documents.map(::decodeListActivity)) }
                 observeCollection("itemOperations") { snapshot ->
                     mutable.value = mutable.value.copy(itemOperations = snapshot.documents.map(::decodeItemOperation))
                 }

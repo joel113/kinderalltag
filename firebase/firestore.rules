@@ -58,6 +58,87 @@ service cloud.firestore {
         && a.interval is int && a.interval >= 1 && a.interval <= 1000 && (a.repeat != 'ONCE' || a.interval == 1)
         && date(a.fromDate) && a.fromDate >= a.details.date && (a.until == null || (date(a.until) && a.until >= a.fromDate));
     }
+    function validListLabel(d) {
+      return d is map && d.keys().hasAll(['id', 'group', 'name', 'color', 'active', 'version'])
+        && d.keys().hasOnly(['id', 'group', 'name', 'color', 'active', 'version'])
+        && text(d.id, 100) && d.group in ['SHOPPING', 'OCCASION', 'GIVER'] && text(d.name, 60)
+        && d.color in ['BLUE', 'ROSE', 'GREEN', 'HONEY', 'BROWN', 'PURPLE'] && d.active is bool
+        && d.version is int && d.version >= 0;
+    }
+    function listLabelAt(d, index) {
+      return d.labelIds.size() <= index || (text(d.labelIds[index], 100)
+        && ((d.kind == 'SHOPPING' && get(/databases/$(database)/documents/households/family/listLabels/$(d.labelIds[index])).data.group == 'SHOPPING')
+          || (d.kind == 'GIFTS' && get(/databases/$(database)/documents/households/family/listLabels/$(d.labelIds[index])).data.group in ['OCCASION', 'GIVER'])));
+    }
+    function validListItem(d) {
+      return d is map && d.keys().hasAll(['id', 'kind', 'title', 'notes', 'recipient', 'labelIds', 'version', 'deleted', 'lastActivityId'])
+        && d.keys().hasOnly(['id', 'kind', 'title', 'notes', 'recipient', 'labelIds', 'version', 'deleted', 'lastActivityId'])
+        && text(d.id, 100) && text(d.title, 120) && d.notes is string && d.notes.size() <= 2000
+        && ((d.kind == 'SHOPPING' && d.recipient == null) || (d.kind == 'GIFTS' && d.recipient in ['FERDINAND', 'JOHANN', 'BOTH_CHILDREN']))
+        && d.version is int && d.version >= 0 && d.deleted is bool && text(d.lastActivityId, 100)
+        && d.labelIds is list && d.labelIds.size() <= 6 && d.labelIds.toSet().size() == d.labelIds.size()
+        && listLabelAt(d, 0) && listLabelAt(d, 1) && listLabelAt(d, 2) && listLabelAt(d, 3) && listLabelAt(d, 4) && listLabelAt(d, 5);
+    }
+    function activityLabelAt(d, index) {
+      return d.labels.size() <= index || (validListLabel(d.labels[index]) && d.labels[index].id == d.snapshot.labelIds[index]
+        && d.labels[index].group == get(/databases/$(database)/documents/households/family/listLabels/$(d.labels[index].id)).data.group);
+    }
+    match /households/family/listLabels/{labelId} {
+      allow read: if member();
+      allow create: if member() && validListLabel(request.resource.data) && request.resource.data.id == labelId && request.resource.data.version == 0;
+      allow update: if member() && validListLabel(request.resource.data) && request.resource.data.id == labelId
+        && request.resource.data.group == resource.data.group && request.resource.data.version == resource.data.version + 1;
+      allow delete: if false;
+    }
+    match /households/family/listItems/{itemId} {
+      function pairedActivity() {
+        let d = request.resource.data;
+        let a = getAfter(/databases/$(database)/documents/households/family/listActivity/$(d.lastActivityId)).data;
+        return a.itemId == itemId && a.snapshot == d && a.authorId == request.auth.uid && a.createdAt == request.time;
+      }
+      function updateAction() {
+        let d = request.resource.data;
+        let action = getAfter(/databases/$(database)/documents/households/family/listActivity/$(d.lastActivityId)).data.action;
+        return (action == 'CHANGED' && !resource.data.deleted && !d.deleted)
+          || (action == 'DELETED' && !resource.data.deleted && d.deleted
+            && d.diff(resource.data).affectedKeys().hasOnly(['version', 'deleted', 'lastActivityId']))
+          || (action == 'RESTORED' && resource.data.deleted && !d.deleted
+            && d.diff(resource.data).affectedKeys().hasOnly(['version', 'deleted', 'lastActivityId']));
+      }
+      allow read: if member();
+      allow create: if member() && validListItem(request.resource.data) && request.resource.data.id == itemId
+        && request.resource.data.version == 0 && !request.resource.data.deleted && pairedActivity()
+        && getAfter(/databases/$(database)/documents/households/family/listActivity/$(request.resource.data.lastActivityId)).data.action == 'ADDED';
+      allow update: if member() && validListItem(request.resource.data) && request.resource.data.id == itemId
+        && request.resource.data.kind == resource.data.kind && request.resource.data.version == resource.data.version + 1
+        && pairedActivity() && updateAction();
+      allow delete: if false;
+    }
+    match /households/family/listActivity/{eventId} {
+      function validListActivity() {
+        let d = request.resource.data;
+        let after = getAfter(/databases/$(database)/documents/households/family/listItems/$(d.itemId)).data;
+        return d.keys().hasAll(['id', 'itemId', 'action', 'snapshot', 'labels', 'authorId', 'authorName', 'clientMillis', 'createdAt', 'targetId'])
+          && d.keys().hasOnly(['id', 'itemId', 'action', 'snapshot', 'labels', 'authorId', 'authorName', 'clientMillis', 'createdAt', 'targetId'])
+          && d.id == eventId && text(d.itemId, 100) && validListItem(d.snapshot) && d.snapshot.id == d.itemId && after.kind == d.snapshot.kind
+          && d.authorId == request.auth.uid && text(d.authorName, 120) && d.createdAt == request.time && d.clientMillis is int
+          && d.labels is list && d.labels.size() == d.snapshot.labelIds.size()
+          && activityLabelAt(d, 0) && activityLabelAt(d, 1) && activityLabelAt(d, 2) && activityLabelAt(d, 3) && activityLabelAt(d, 4) && activityLabelAt(d, 5)
+          && ((d.action == 'BOUGHT' && d.targetId == null
+              && get(/databases/$(database)/documents/households/family/listActivity/$(d.snapshot.lastActivityId)).data.snapshot == d.snapshot)
+            || (d.action == 'REOPENED' && text(d.targetId, 100)
+              && get(/databases/$(database)/documents/households/family/listActivity/$(d.snapshot.lastActivityId)).data.snapshot == d.snapshot
+              && get(/databases/$(database)/documents/households/family/listActivity/$(d.targetId)).data.action == 'BOUGHT'
+              && get(/databases/$(database)/documents/households/family/listActivity/$(d.targetId)).data.itemId == d.itemId)
+            || (d.action in ['ADDED', 'CHANGED', 'DELETED', 'RESTORED'] && d.targetId == null
+              && after.lastActivityId == eventId && after == d.snapshot
+              && ((d.action == 'ADDED' && !exists(/databases/$(database)/documents/households/family/listItems/$(d.itemId)))
+                || (d.action != 'ADDED' && after.version == get(/databases/$(database)/documents/households/family/listItems/$(d.itemId)).data.version + 1))));
+      }
+      allow read: if member();
+      allow create: if member() && validListActivity();
+      allow update, delete: if false;
+    }
     match /households/family/members/{uid} {
       allow get: if request.auth != null && (request.auth.uid == uid || member());
       allow list: if member();

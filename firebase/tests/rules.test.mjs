@@ -361,3 +361,139 @@ test('offline confirmations can carry immutable occurrence snapshots tied to the
     occurrenceId, taskSnapshot: { ...snapshot, sourceId: 'missing' },
   })));
 });
+
+const familyListItem = (id = 'milk', kind = 'SHOPPING', extra = {}) => ({ id, kind, title: 'Milch', notes: '',
+  recipient: kind === 'GIFTS' ? 'BOTH_CHILDREN' : null, labelIds: [], version: 0, deleted: false,
+  lastActivityId: `add-${id}`, ...extra });
+const familyLabel = (id = 'shop', group = 'SHOPPING', extra = {}) => ({ id, group, name: 'Supermarkt', color: 'BLUE', active: true, version: 0, ...extra });
+const listAudit = (uid, snapshot, action, id, extra = {}) => ({ id, itemId: snapshot.id, action, snapshot,
+  labels: [], authorId: uid, authorName: uid, clientMillis: Date.now(), createdAt: serverTimestamp(), targetId: null, ...extra });
+async function createFamilyList(db, uid, item, extra = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, `${path}/listItems/${item.id}`), item);
+  batch.set(doc(db, `${path}/listActivity/${item.lastActivityId}`), listAudit(uid, item, 'ADDED', item.lastActivityId, extra));
+  return batch.commit();
+}
+async function changeFamilyList(db, uid, item, action, extra = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, `${path}/listItems/${item.id}`), item);
+  batch.set(doc(db, `${path}/listActivity/${item.lastActivityId}`), listAudit(uid, item, action, item.lastActivityId, extra));
+  return batch.commit();
+}
+
+test('family list creation is member-only and requires its atomic immutable audit', async () => {
+  const db = dbFor('parent-a');
+  const item = familyListItem();
+  await assertFails(setDoc(doc(db, `${path}/listItems/milk`), item));
+  await assertFails(createFamilyList(dbFor('stranger'), 'stranger', item));
+  await assertSucceeds(createFamilyList(db, 'parent-a', item));
+  await assertSucceeds(getDocs(collection(dbFor('parent-b'), `${path}/listItems`)));
+  for (const name of ['listItems', 'listActivity', 'listLabels']) {
+    await assertFails(getDocs(collection(dbFor('stranger'), `${path}/${name}`)));
+    await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(), `${path}/${name}`)));
+  }
+  await assertFails(updateDoc(doc(db, `${path}/listActivity/add-milk`), { title: 'Rewrite' }));
+  await assertFails(deleteDoc(doc(db, `${path}/listActivity/add-milk`)));
+  await assertFails(deleteDoc(doc(db, `${path}/listItems/milk`)));
+});
+
+test('undated list schemas reject parent assignments and inappropriate recipients', async () => {
+  const db = dbFor('parent-a');
+  for (const [index, changes] of [
+    { dueDate: '2026-12-24' }, { responsibleParentId: 'parent-a' }, { recipient: 'JOHANN' },
+    { title: '' }, { notes: 'x'.repeat(2001) }, { kind: 'OTHER' },
+  ].entries()) await assertFails(createFamilyList(db, 'parent-a', familyListItem(`invalid-${index}`, 'SHOPPING', changes)));
+  await assertFails(createFamilyList(db, 'parent-a', familyListItem('gift-household', 'GIFTS', { recipient: 'HOUSEHOLD' })));
+  await assertFails(createFamilyList(db, 'parent-a', familyListItem('gift-none', 'GIFTS', { recipient: null })));
+  for (const recipient of ['JOHANN', 'FERDINAND', 'BOTH_CHILDREN']) {
+    await assertSucceeds(createFamilyList(db, 'parent-a', familyListItem(`gift-${recipient}`, 'GIFTS', { recipient })));
+  }
+});
+
+test('list edits use versions, authenticated actors and matching audit snapshots', async () => {
+  const db = dbFor('parent-a');
+  const item = familyListItem();
+  await assertSucceeds(createFamilyList(db, 'parent-a', item));
+  const changed = { ...item, title: 'Brot', version: 1, lastActivityId: 'change-milk' };
+  await assertFails(setDoc(doc(db, `${path}/listItems/milk`), changed));
+  await assertFails(changeFamilyList(db, 'parent-a', changed, 'CHANGED', { authorId: 'parent-b' }));
+  await assertSucceeds(changeFamilyList(db, 'parent-a', changed, 'CHANGED'));
+  await assertFails(changeFamilyList(dbFor('parent-b'), 'parent-b', { ...changed, lastActivityId: 'stale' }, 'CHANGED'));
+  await assertFails(changeFamilyList(db, 'parent-a', { ...changed, version: 2, lastActivityId: 'fake-snapshot' }, 'CHANGED', { snapshot: item }));
+  await assertFails(changeFamilyList(db, 'parent-a', { ...changed, version: 2, lastActivityId: 'kind-change', kind: 'GIFTS', recipient: 'JOHANN' }, 'CHANGED'));
+});
+
+test('both parents can append purchases and retract matching known purchases', async () => {
+  const a = dbFor('parent-a');
+  const b = dbFor('parent-b');
+  const item = familyListItem();
+  await assertSucceeds(createFamilyList(a, 'parent-a', item));
+  await assertSucceeds(setDoc(doc(a, `${path}/listActivity/bought-a`), listAudit('parent-a', item, 'BOUGHT', 'bought-a')));
+  await assertSucceeds(setDoc(doc(b, `${path}/listActivity/bought-b`), listAudit('parent-b', item, 'BOUGHT', 'bought-b')));
+  await assertSucceeds(setDoc(doc(b, `${path}/listActivity/reopen-a`), listAudit('parent-b', item, 'REOPENED', 'reopen-a', { targetId: 'bought-a' })));
+  await assertFails(setDoc(doc(a, `${path}/listActivity/reopen-invalid`), listAudit('parent-a', item, 'REOPENED', 'reopen-invalid', { targetId: 'add-milk' })));
+  await assertFails(setDoc(doc(a, `${path}/listActivity/bought-forged`), listAudit('parent-b', item, 'BOUGHT', 'bought-forged')));
+  const other = familyListItem('other');
+  await assertSucceeds(createFamilyList(a, 'parent-a', other));
+  await assertFails(setDoc(doc(a, `${path}/listActivity/reopen-wrong`), listAudit('parent-a', other, 'REOPENED', 'reopen-wrong', { targetId: 'bought-a' })));
+});
+
+test('soft deletion and restoration preserve details and accept late offline purchases', async () => {
+  const a = dbFor('parent-a');
+  const b = dbFor('parent-b');
+  const item = familyListItem();
+  await assertSucceeds(createFamilyList(a, 'parent-a', item));
+  const deleted = { ...item, deleted: true, version: 1, lastActivityId: 'deleted' };
+  await assertFails(changeFamilyList(a, 'parent-a', { ...deleted, title: 'Overwrite' }, 'DELETED'));
+  await assertSucceeds(changeFamilyList(a, 'parent-a', deleted, 'DELETED'));
+  await assertSucceeds(setDoc(doc(b, `${path}/listActivity/offline-buy`), listAudit('parent-b', item, 'BOUGHT', 'offline-buy')));
+  await assertFails(changeFamilyList(a, 'parent-a', { ...deleted, version: 2, lastActivityId: 'edit-deleted' }, 'CHANGED'));
+  const restored = { ...deleted, deleted: false, version: 2, lastActivityId: 'restored' };
+  await assertSucceeds(changeFamilyList(b, 'parent-b', restored, 'RESTORED'));
+  assert.equal((await getDoc(doc(a, `${path}/listItems/milk`))).data().title, 'Milch');
+  assert.equal((await getDoc(doc(a, `${path}/listActivity/offline-buy`))).data().action, 'BOUGHT');
+});
+
+test('labels retain stable groups, version changes and archived references', async () => {
+  const db = dbFor('parent-a');
+  const label = familyLabel();
+  await assertFails(setDoc(doc(dbFor('stranger'), `${path}/listLabels/shop`), label));
+  await assertSucceeds(setDoc(doc(db, `${path}/listLabels/shop`), label));
+  await assertFails(setDoc(doc(db, `${path}/listLabels/shop`), { ...label, name: 'Changed without version' }));
+  await assertFails(setDoc(doc(db, `${path}/listLabels/shop`), { ...label, group: 'GIVER', version: 1 }));
+  await assertFails(deleteDoc(doc(db, `${path}/listLabels/shop`)));
+  const item = familyListItem('labelled', 'SHOPPING', { labelIds: ['shop'] });
+  await assertSucceeds(createFamilyList(db, 'parent-a', item, { labels: [label] }));
+  await assertSucceeds(setDoc(doc(db, `${path}/listLabels/shop`), { ...label, name: 'Lebensmittel', active: false, version: 1 }));
+  await assertSucceeds(setDoc(doc(db, `${path}/listActivity/late-labelled`), listAudit('parent-a', item, 'BOUGHT', 'late-labelled', { labels: [label] })));
+  assert.equal((await getDoc(doc(db, `${path}/listActivity/add-labelled`))).data().labels[0].name, 'Supermarkt');
+  await assertFails(createFamilyList(db, 'parent-a', familyListItem('missing-label', 'SHOPPING', { labelIds: ['missing'] })));
+});
+
+test('label groups and six-label snapshots are validated within Firestore access limits', async () => {
+  const db = dbFor('parent-a');
+  const labels = [];
+  for (let index = 0; index < 6; index++) {
+    const label = familyLabel(`label-${index}`, index < 3 ? 'OCCASION' : 'GIVER');
+    await assertSucceeds(setDoc(doc(db, `${path}/listLabels/${label.id}`), label));
+    labels.push(label);
+  }
+  const gift = familyListItem('six-labels', 'GIFTS', { labelIds: labels.map(label => label.id) });
+  await assertSucceeds(createFamilyList(db, 'parent-a', gift, { labels }));
+  await assertFails(createFamilyList(db, 'parent-a', familyListItem('wrong-group', 'SHOPPING', { labelIds: [labels[0].id] }), { labels: [labels[0]] }));
+  await assertFails(createFamilyList(db, 'parent-a', familyListItem('missing-snapshot', 'GIFTS', { labelIds: [labels[0].id] })));
+  await assertFails(createFamilyList(db, 'parent-a', familyListItem('wrong-snapshot', 'GIFTS', { labelIds: [labels[0].id] }), { labels: [labels[1]] }));
+});
+
+
+test('purchase snapshots must reference an actual immutable item version', async () => {
+  const db = dbFor('parent-a');
+  const item = familyListItem();
+  await assertSucceeds(createFamilyList(db, 'parent-a', item));
+  const fabricated = { ...item, title: 'A title that never existed' };
+  await assertFails(setDoc(doc(db, `${path}/listActivity/forged-version`), listAudit('parent-a', fabricated, 'BOUGHT', 'forged-version')));
+  const changed = { ...item, title: 'New title', version: 1, lastActivityId: 'new-title' };
+  await assertSucceeds(changeFamilyList(db, 'parent-a', changed, 'CHANGED'));
+  await assertSucceeds(setDoc(doc(db, `${path}/listActivity/old-offline-version`), listAudit('parent-a', item, 'BOUGHT', 'old-offline-version')));
+  assert.equal((await getDoc(doc(db, `${path}/listActivity/old-offline-version`))).data().snapshot.title, 'Milch');
+});

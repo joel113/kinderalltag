@@ -28,8 +28,8 @@ internal fun StatisticsScreen(state: FamilyState, today: LocalDate, days: Int, p
     val period = statisticsPeriod(today, days, page)
     val statistics = remember(state, period) {
         val entries = activityHistory(state.revisions, state.events, state.appointments, state.appointmentExceptions,
-            state.appointmentActivity, state.parents, period, operations = state.itemOperations)
-        eventStatistics(entries, state.events, state.parents, state.children)
+            state.appointmentActivity, state.parents, period, operations = state.itemOperations, listActivity = state.listActivity)
+        eventStatistics(entries, state.events, state.parents, state.children, state.listActivity)
     }
     val listState = rememberLazyListState()
     LaunchedEffect(days, page) { listState.scrollToItem(0) }
@@ -55,12 +55,20 @@ internal fun StatisticsScreen(state: FamilyState, today: LocalDate, days: Int, p
                 }
             }
         }
-        if (statistics.total.events == 0) item { Text("Keine Ereignisse in diesem Zeitraum.") }
         item {
+            Card(colors = CardDefaults.cardColors(containerColor = GardenColors.Sky, contentColor = GardenColors.Ink)) {
+                Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StatisticsCounter("Besorgte Artikel", statistics.total.boughtShopping, Modifier.weight(1f))
+                    StatisticsCounter("Gekaufte Geschenke", statistics.total.boughtGifts, Modifier.weight(1f))
+                }
+            }
+        }
+        if (statistics.total.events == 0) item { Text("Keine Ereignisse in diesem Zeitraum.") }
+        if (statistics.total.events > 0) item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Farben der Ereignisse", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HistoryKind.entries.forEach { kind ->
+                    HistoryKind.entries.filter { (statistics.total.byKind[it] ?: 0) > 0 }.forEach { kind ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Box(Modifier.size(10.dp, 14.dp).background(historyEventColor(kind), RoundedCornerShape(3.dp)))
                             Text(statisticsKindLabel(kind), style = MaterialTheme.typography.bodySmall)
@@ -70,7 +78,7 @@ internal fun StatisticsScreen(state: FamilyState, today: LocalDate, days: Int, p
             }
         }
         item { StatisticsBreakdown("Nach Elternteil", statistics.parents) }
-        item { StatisticsBreakdown("Nach Kind & Haushalt", statistics.subjects) }
+        item { StatisticsBreakdown("Nach Bereich", statistics.subjects) }
         item {
             StatisticsBreakdown("Nach Wochentag", statistics.weekdays.map { row ->
                 row.copy(label = DayOfWeek.valueOf(row.id).getDisplayName(TextStyle.FULL, formats.locale))
@@ -82,6 +90,7 @@ internal fun StatisticsScreen(state: FamilyState, today: LocalDate, days: Int, p
                     style = MaterialTheme.typography.bodySmall)
                 Text("Erledigte Aufgaben: Jede Ausführung zählt einmal, anhand der ersten noch gültigen Bestätigung. Zurückgenommene Bestätigungen zählen nicht; spätere Korrekturen können frühere Statistiken verändern.",
                     style = MaterialTheme.typography.bodySmall)
+                Text("Gekaufte Einträge zählen anhand der ersten noch gültigen Kaufbestätigung einmal. Wieder geöffnete Einträge zählen nicht. Änderungen können auch frühere Zeiträume beeinflussen.", style = MaterialTheme.typography.bodySmall)
                 Text("Ältere Terminereignisse können unvollständig sein.", style = MaterialTheme.typography.bodySmall)
                 if (statistics.reconstructedEvents > 0) Text("Aus vorhandenem Datenstand rekonstruiert: ${statistics.reconstructedEvents}.",
                     style = MaterialTheme.typography.bodySmall)
@@ -121,6 +130,7 @@ private fun StatisticsBreakdown(title: String, rows: List<StatisticsRow>) {
                     Text("${row.counts.events} ${if (row.counts.events == 1) "Ereignis" else "Ereignisse"} · " +
                         "${row.counts.completedTasks} ${if (row.counts.completedTasks == 1) "erledigte Aufgabe" else "erledigte Aufgaben"}",
                         style = MaterialTheme.typography.bodySmall)
+                    Text("Gekauft: ${row.counts.boughtShopping} Einkäufe · ${row.counts.boughtGifts} Geschenkideen", style = MaterialTheme.typography.bodySmall)
                     Box(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp))
                         .background(GardenColors.Mint).clearAndSetSemantics {
                             contentDescription = row.counts.byKind.entries.joinToString("; ") { (kind, count) ->
@@ -141,6 +151,18 @@ private fun StatisticsBreakdown(title: String, rows: List<StatisticsRow>) {
 }
 
 private fun statisticsKindLabel(kind: HistoryKind): String = when (kind) {
+    HistoryKind.SHOPPING_ADDED -> "Einkauf angelegt"
+    HistoryKind.SHOPPING_CHANGED -> "Einkauf geändert"
+    HistoryKind.SHOPPING_BOUGHT -> "Einkauf gekauft"
+    HistoryKind.SHOPPING_REOPENED -> "Einkauf wieder geöffnet"
+    HistoryKind.SHOPPING_DELETED -> "Einkauf gelöscht"
+    HistoryKind.SHOPPING_RESTORED -> "Einkauf wiederhergestellt"
+    HistoryKind.GIFT_ADDED -> "Geschenkidee angelegt"
+    HistoryKind.GIFT_CHANGED -> "Geschenkidee geändert"
+    HistoryKind.GIFT_BOUGHT -> "Geschenkidee gekauft"
+    HistoryKind.GIFT_REOPENED -> "Geschenkidee wieder geöffnet"
+    HistoryKind.GIFT_DELETED -> "Geschenkidee gelöscht"
+    HistoryKind.GIFT_RESTORED -> "Geschenkidee wiederhergestellt"
     HistoryKind.TASK_COMPLETED -> "Bestätigungen"
     HistoryKind.TASK_CORRECTED -> "Korrekturen"
     HistoryKind.TASK_UPDATED -> "Aufgabenverwaltung"

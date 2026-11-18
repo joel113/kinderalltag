@@ -28,7 +28,7 @@ internal fun HistoryFeed(state: FamilyState, today: LocalDate, page: Long, secti
     val period = historyPeriod(today, page)
     val entries = remember(state, period, sectionId, onlyMine) {
         activityHistory(state.revisions, state.events, state.appointments, state.appointmentExceptions,
-            state.appointmentActivity, state.parents, period, sectionId, onlyMine, state.uid, state.itemOperations)
+            state.appointmentActivity, state.parents, period, sectionId, onlyMine, state.uid, state.itemOperations, state.listActivity)
     }
     val listState = rememberLazyListState()
     LaunchedEffect(page) { listState.scrollToItem(0) }
@@ -70,6 +70,12 @@ internal fun HistoryFeed(state: FamilyState, today: LocalDate, page: Long, secti
 }
 
 internal fun historyEventColor(kind: HistoryKind): Color = when (kind) {
+    HistoryKind.SHOPPING_ADDED, HistoryKind.GIFT_ADDED -> GardenColors.Mustard
+    HistoryKind.SHOPPING_CHANGED, HistoryKind.GIFT_CHANGED -> GardenColors.Blue
+    HistoryKind.SHOPPING_BOUGHT, HistoryKind.GIFT_BOUGHT -> GardenColors.Green
+    HistoryKind.SHOPPING_REOPENED, HistoryKind.GIFT_REOPENED -> GardenColors.Coral
+    HistoryKind.SHOPPING_DELETED, HistoryKind.GIFT_DELETED -> GardenColors.Coral
+    HistoryKind.SHOPPING_RESTORED, HistoryKind.GIFT_RESTORED -> GardenColors.Green
     HistoryKind.TASK_COMPLETED -> GardenColors.Green
     HistoryKind.TASK_CORRECTED -> GardenColors.Coral
     HistoryKind.TASK_UPDATED -> GardenColors.Blue
@@ -104,6 +110,7 @@ private fun HistoryEventRow(entry: HistoryEntry, state: FamilyState) {
                 Text(if (entry.creditedId != null && entry.creditedId != entry.authorId)
                     "${entry.creditedName ?: "Elternteil"} · eingetragen von ${entry.authorName}"
                     else entry.creditedName ?: entry.authorName, style = MaterialTheme.typography.bodySmall)
+                if (entry.labels.isNotEmpty()) Text(entry.labels.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
                 entry.operationScope?.let { Text(scopeLabel(it), style = MaterialTheme.typography.bodySmall) }
                 entry.subjectDate?.let { Text("Bezugstag: ${formats.date(it)}", style = MaterialTheme.typography.bodySmall) }
                 if (entry.pending) Text("Synchronisierung ausstehend", style = MaterialTheme.typography.bodySmall)

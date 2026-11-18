@@ -53,7 +53,7 @@ import java.time.*
 import java.util.UUID
 
 private enum class AppPage(val title: String) {
-    HOME("Heute"), TASKS("Aufgaben"), APPOINTMENTS("Termine"), HISTORY("Verlauf"),
+    HOME("Heute"), TASKS("Aufgaben"), APPOINTMENTS("Termine"), SHOPPING("Einkaufsliste"), GIFTS("Geschenkideen"), HISTORY("Verlauf"),
     STATISTICS("Statistik"), TRASH("Papierkorb"), SETTINGS("Einstellungen"),
 }
 
@@ -159,9 +159,10 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
         }
         return@KinderTheme
     }
-    var tab by rememberSaveable { mutableStateOf(if (initialOccurrence?.startsWith("appointment_") == true) AppPage.APPOINTMENTS else if (initialDate != null) AppPage.HISTORY else when (initialPage) { "tasks" -> AppPage.TASKS; "appointments" -> AppPage.APPOINTMENTS; else -> AppPage.HOME }) }
-    val primaryPages = listOf(AppPage.HOME, AppPage.TASKS, AppPage.APPOINTMENTS)
+    var tab by rememberSaveable { mutableStateOf(if (initialOccurrence?.startsWith("appointment_") == true) AppPage.APPOINTMENTS else if (initialOccurrence != null) AppPage.HOME else if (initialDate != null) AppPage.HISTORY else when (initialPage) { "tasks" -> AppPage.TASKS; "appointments" -> AppPage.APPOINTMENTS; "shopping" -> AppPage.SHOPPING; "gifts" -> AppPage.GIFTS; else -> AppPage.HOME }) }
+    val primaryPages = listOf(AppPage.HOME, AppPage.TASKS, AppPage.APPOINTMENTS, AppPage.SHOPPING)
     var lastPrimaryPage by rememberSaveable { mutableStateOf(if (tab in primaryPages) tab else AppPage.HOME) }
+    LaunchedEffect(lastPrimaryPage) { if (lastPrimaryPage !in primaryPages) lastPrimaryPage = AppPage.HOME }
     var moreMenuExpanded by remember { mutableStateOf(false) }
     var statisticsDays by rememberSaveable { mutableIntStateOf(90) }
     var statisticsPage by rememberSaveable { mutableLongStateOf(0L) }
@@ -176,12 +177,12 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
     var appointmentCalendar by rememberSaveable(stateSaver = calendarOverviewSaver) { mutableStateOf(CalendarOverviewState(today)) }
     var taskPage by rememberSaveable { mutableLongStateOf(0L) }
     var agendaPage by rememberSaveable { mutableLongStateOf(0L) }
-    val appointmentUi = remember { AppointmentUiState() }
+    val appointmentUi = vm.appointmentUi
     BackHandler(enabled = tab !in primaryPages) { tab = lastPrimaryPage }
-    var editing by remember { mutableStateOf<TaskRevision?>(null) }
-    var taskEditSelection by remember { mutableStateOf<TaskEditSelection?>(null) }
+    var editing by vm.taskEditorRevision
+    var taskEditSelection by vm.taskEditorSelection
     var itemAction by remember { mutableStateOf<ItemActionTarget?>(null) }
-    var editorOpen by remember { mutableStateOf(false) }
+    var editorOpen by vm.taskEditorOpen
     LaunchedEffect(editorOpen) { if (editorOpen) vm.taskError.value = null }
     var selected by remember { mutableStateOf<Occurrence?>(null) }
     var openedInitial by rememberSaveable { mutableStateOf(false) }
@@ -211,15 +212,38 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
     }
     val homeButtonsWidth = (LocalConfiguration.current.screenWidthDp.dp - 32.dp).coerceAtMost(360.dp)
     val nav = primaryPages
-    val icons = listOf(Icons.Default.WbSunny, Icons.Default.LocalFlorist, Icons.Default.Event)
-    val navColors = listOf(GardenColors.Green, GardenColors.Blue, GardenColors.Burgundy)
+    val icons = listOf(Icons.Default.WbSunny, Icons.Default.LocalFlorist, Icons.Default.Event, Icons.Default.ShoppingBasket)
+    val navColors = listOf(GardenColors.Green, GardenColors.Blue, GardenColors.Burgundy, GardenColors.Green)
     GardenBackground(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snack) },
             topBar = { TopAppBar(title = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GardenDrawing(GardenMotif.SPROUT, Modifier.size(34.dp))
+                    Box {
+                        IconButton(onClick = { moreMenuExpanded = !moreMenuExpanded },
+                            modifier = Modifier.semantics { contentDescription = "Weitere Seiten öffnen" }) {
+                            GardenDrawing(GardenMotif.SPROUT, Modifier.size(34.dp))
+                        }
+                        DropdownMenu(expanded = moreMenuExpanded, onDismissRequest = { moreMenuExpanded = false }) {
+                            DropdownMenuItem(text = { Text("Geschenkideen") }, leadingIcon = {
+                                Icon(Icons.Default.CardGiftcard, null, tint = GardenColors.Coral)
+                            }, onClick = {
+                                moreMenuExpanded = false
+                                if (tab != AppPage.GIFTS) vm.listUi.nextThought(FamilyListKind.GIFTS)
+                                tab = AppPage.GIFTS
+                            })
+                            DropdownMenuItem(text = { Text("Verlauf") }, leadingIcon = {
+                                Icon(Icons.Default.History, null, tint = GardenColors.Coral)
+                            }, onClick = { moreMenuExpanded = false; tab = AppPage.HISTORY })
+                            DropdownMenuItem(text = { Text("Statistik") }, leadingIcon = {
+                                Icon(Icons.Default.BarChart, null, tint = GardenColors.Green)
+                            }, onClick = { moreMenuExpanded = false; tab = AppPage.STATISTICS })
+                            DropdownMenuItem(text = { Text("Papierkorb") }, leadingIcon = {
+                                Icon(Icons.Default.DeleteOutline, null, tint = GardenColors.Coral)
+                            }, onClick = { moreMenuExpanded = false; tab = AppPage.TRASH })
+                        }
+                    }
                     Text(if (tab in primaryPages) "Kinderalltag" else tab.title,
                         fontWeight = FontWeight.ExtraBold, color = green, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -229,24 +253,11 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
                 }
             }, actions = {
                 IconButton(onClick = { moreMenuExpanded = false; tab = AppPage.SETTINGS }) { Icon(Icons.Default.Settings, "Einstellungen") }
-                Box {
-                    IconButton(onClick = { moreMenuExpanded = true }) { Icon(Icons.Default.MoreHoriz, "Weitere Seiten") }
-                    DropdownMenu(expanded = moreMenuExpanded, onDismissRequest = { moreMenuExpanded = false }) {
-                        DropdownMenuItem(text = { Text("Verlauf") }, leadingIcon = {
-                            Icon(Icons.Default.History, null, tint = GardenColors.Coral)
-                        }, onClick = { moreMenuExpanded = false; tab = AppPage.HISTORY })
-                        DropdownMenuItem(text = { Text("Statistik") }, leadingIcon = {
-                            Icon(Icons.Default.BarChart, null, tint = GardenColors.Green)
-                        }, onClick = { moreMenuExpanded = false; tab = AppPage.STATISTICS })
-                        DropdownMenuItem(text = { Text("Papierkorb") }, leadingIcon = {
-                            Icon(Icons.Default.DeleteOutline, null, tint = GardenColors.Coral)
-                        }, onClick = { moreMenuExpanded = false; tab = AppPage.TRASH })
-                    }
-                }
             }) },
             bottomBar = {
                 NavigationBar(containerColor = GardenColors.Cream, tonalElevation = 0.dp) { nav.forEachIndexed { index, destination ->
                     NavigationBarItem(selected = tab == destination, onClick = {
+                        if (destination == AppPage.SHOPPING && tab != destination) vm.listUi.nextThought(FamilyListKind.SHOPPING)
                         if (destination == AppPage.TASKS && tab != AppPage.TASKS) taskMessageIndex = (taskMessageIndex + 1) % taskEncouragements.size
                         if (destination == AppPage.APPOINTMENTS && tab != AppPage.APPOINTMENTS) appointmentMessageIndex = (appointmentMessageIndex + 1) % appointmentEncouragements.size
                         moreMenuExpanded = false
@@ -254,7 +265,7 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
                         tab = destination
                         if (destination == AppPage.HOME) homeDayOffset = 0L
                     },
-                        icon = { Icon(icons[index], null) }, label = { Text(destination.title) },
+                        icon = { Icon(icons[index], null) }, label = { Text(destination.title, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = navColors[index], selectedTextColor = navColors[index],
                             indicatorColor = navColors[index].copy(alpha = 0.12f),
@@ -269,6 +280,8 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
                     }
                     AppPage.TASKS -> YellowAddButton("Aufgabe") { editing = null; taskEditSelection = null; editorOpen = true }
                     AppPage.APPOINTMENTS -> YellowAddButton("Termin") { appointmentUi.editor = AppointmentEditTarget(null) }
+                    AppPage.SHOPPING -> YellowAddButton("Einkauf") { vm.listUi.voiceImportOpen = true }
+                    AppPage.GIFTS -> YellowAddButton("Geschenkidee") { vm.listUi.editor = ListEditTarget(FamilyListKind.GIFTS) }
                     else -> Unit
                 }
             },
@@ -296,7 +309,7 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
                     }) { Text("Prüfen") }
                     TextButton(onClick = { incoming.key?.let { inbox.consume(it) } }) { Text("Überspringen") }
                 }
-                if (tab != AppPage.SETTINGS && tab != AppPage.STATISTICS && tab != AppPage.TRASH) Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+                if (tab in listOf(AppPage.HOME, AppPage.TASKS, AppPage.APPOINTMENTS, AppPage.HISTORY)) Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     FilterChip(onlyMine, { onlyMine = !onlyMine; taskPage = 0 }, label = { Text("Nur meine") })
                     VerticalDivider(Modifier.height(24.dp))
@@ -307,12 +320,12 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
                     AppPage.HOME -> {
                         val date = today.plusDays(homeDayOffset)
                         Checklist(state, date, today, selectedChild, onlyMine,
-                            now = now, onSelectDate = { chosen -> homeDayOffset = chosen.toEpochDay() - today.toEpochDay() },
+                            vm = vm, busy = busy, now = now, onSelectDate = { chosen -> homeDayOffset = chosen.toEpochDay() - today.toEpochDay() },
                             onOpenAppointment = { appointmentUi.open(it, state) }, onOpen = { selected = it })
                     }
                     AppPage.HISTORY -> HistoryFeed(state, today, historyPage, selectedChild, onlyMine,
                         onPageChange = { historyPage = it })
-                    AppPage.TASKS -> TaskList(state, today, busy, selectedChild, onlyMine, taskPage, onPageChange = { taskPage = it },
+                    AppPage.TASKS -> TaskList(state, today, now, busy, selectedChild, onlyMine, taskPage, onPageChange = { taskPage = it },
                         encouragement = taskEncouragements[taskMessageIndex.coerceAtLeast(0)], showIntroduction = showIntroductions, showCalendar = showCalendars,
                         calendar = taskCalendar, onCalendarChange = { taskCalendar = it; taskPage = 0 }, onEdit = { itemAction = ItemActionTarget(false, definition = it, expectedVersion = state.version(ItemType.TASK, it.taskId)) },
                         onDelete = { task, date ->
@@ -324,6 +337,8 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
                         encouragement = appointmentEncouragements[appointmentMessageIndex], showIntroduction = showIntroductions, showCalendar = showCalendars,
                         calendar = appointmentCalendar, onCalendarChange = { appointmentCalendar = it; agendaPage = 0 },
                         onPageChange = { agendaPage = it }, onOpen = { appointmentUi.open(it, state) })
+                    AppPage.SHOPPING -> FamilyListPage(FamilyListKind.SHOPPING, state, vm, showIntroductions)
+                    AppPage.GIFTS -> FamilyListPage(FamilyListKind.GIFTS, state, vm, showIntroductions)
                     AppPage.STATISTICS -> StatisticsScreen(state, today, statisticsDays, statisticsPage,
                         onDaysChange = { statisticsDays = it; statisticsPage = 0 }, onPageChange = { statisticsPage = it })
                     AppPage.TRASH -> TrashScreen(state, vm)
@@ -359,8 +374,9 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
             .firstOrNull { it.taskId == selection.occurrence.revision.taskId } ?: selection.occurrence.revision else selection.occurrence.revision
         editorOpen = true
     }) }
+    FamilyListDialogs(state, vm)
     AppointmentDialogs(appointmentUi, state, vm, onImported = { key, done -> inbox.consume(key, done) })
-    selected?.let { occurrence -> OccurrenceDialog(occurrence, state, today,
+    selected?.let { occurrence -> OccurrenceDialog(occurrence, state, today, now,
         onDismiss = { selected = null }, onComplete = { parentId -> vm.complete(occurrence, parentId) }, onUndo = { vm.undo(occurrence) },
         onEdit = { selected = null; itemAction = ItemActionTarget(false, task = occurrence, expectedVersion = state.version(ItemType.TASK, occurrence.revision.taskId)) },
         onDelete = { selected = null; itemAction = ItemActionTarget(true, task = occurrence, expectedVersion = state.version(ItemType.TASK, occurrence.revision.taskId)) }) }
@@ -369,7 +385,7 @@ fun KinderApp(vm: FamilyViewModel, initialDate: String?, initialOccurrence: Stri
 @Composable
 private fun Checklist(state: FamilyState, date: LocalDate, today: LocalDate, childId: String?,
     onlyMine: Boolean = false, showTasks: Boolean = true, showAppointments: Boolean = true,
-    now: Instant = Instant.now(), onSelectDate: ((LocalDate) -> Unit)? = null, onOpenAppointment: (AppointmentOccurrence) -> Unit = {}, onOpen: (Occurrence) -> Unit) {
+    vm: FamilyViewModel? = null, busy: Boolean = false, now: Instant = Instant.now(), onSelectDate: ((LocalDate) -> Unit)? = null, onOpenAppointment: (AppointmentOccurrence) -> Unit = {}, onOpen: (Occurrence) -> Unit) {
     val formats = rememberDateTimeFormats()
     val due = state.taskOccurrences(date).filter {
         showTasks && (childId == null || it.revision.childId == childId) && (!onlyMine || isResponsible(it.revision.responsibleParentId, state.uid))
@@ -482,6 +498,7 @@ private fun Checklist(state: FamilyState, date: LocalDate, today: LocalDate, chi
             if (appointments.isEmpty()) item { EmptyCard("Für diesen Tag stehen keine Termine an.") }
             items(appointments, key = { it.id }) { AppointmentCard(it, state) { onOpenAppointment(it) } }
         }
+        if (vm != null) shoppingHome(state, vm, busy)
         item { EndOfPageFooter(GardenMotif.WORM) }
     }
 }
@@ -521,20 +538,22 @@ private fun GardenChildChip(child: Child, selected: Boolean, onClick: () -> Unit
 }
 
 @Composable
-private fun TaskList(state: FamilyState, today: LocalDate, busy: Boolean, sectionId: String?, onlyMine: Boolean, page: Long, onPageChange: (Long) -> Unit, encouragement: String, showIntroduction: Boolean, showCalendar: Boolean,
+private fun TaskList(state: FamilyState, today: LocalDate, now: Instant, busy: Boolean, sectionId: String?, onlyMine: Boolean, page: Long, onPageChange: (Long) -> Unit, encouragement: String, showIntroduction: Boolean, showCalendar: Boolean,
     calendar: CalendarOverviewState, onCalendarChange: (CalendarOverviewState) -> Unit, onEdit: (TaskRevision) -> Unit, onDelete: (TaskRevision, LocalDate?) -> Unit, onArchive: (TaskRevision) -> Unit) {
     val formats = rememberDateTimeFormats()
     val selectedPeriod = calendar.period.takeIf { showCalendar && calendar.filterActive }
     val calendarDates = calendar.visibleDates
     val calendarPreviews = if (showCalendar) taskCalendarPreviews(state.revisions, calendarDates, sectionId, state.uid, onlyMine, state.events, state.itemOperations) else emptyMap()
-    val editableVersions = state.taskDefinitions(Instant.now(), includePaused = true).associateBy { it.taskId }
-    val scheduledTasks = if (selectedPeriod == null) state.taskDefinitions(Instant.now())
+    val editableVersions = state.taskDefinitions(now, includePaused = true).associateBy { it.taskId }
+    val scheduledTasks = if (selectedPeriod == null) state.taskDefinitions(now)
         else tasksInCalendarPeriod(state.revisions, selectedPeriod, sectionId, state.uid, onlyMine, state.events, state.itemOperations)
-    val tasks = scheduledTasks.filter {
+    val filteredTasks = scheduledTasks.filter {
         (sectionId == null || it.childId == sectionId) && (!onlyMine || isResponsible(it.responsibleParentId, state.uid))
-    }.sortedWith(compareBy<TaskRevision> { it.title.lowercase(java.util.Locale.ROOT) }.thenBy { it.taskId })
+    }
+    val timings = taskOverviewTimings(filteredTasks.map { it.taskId }.toSet(), state.revisions, state.events, state.itemOperations, now, selectedPeriod)
+    val tasks = chronologicalTasks(filteredTasks, timings)
     var showPaused by rememberSaveable { mutableStateOf(false) }
-    val paused = state.taskDefinitions(Instant.now(), includePaused = true).filter { task ->
+    val paused = state.taskDefinitions(now, includePaused = true).filter { task ->
         !task.active && (sectionId == null || task.childId == sectionId) &&
             (!onlyMine || isResponsible(task.responsibleParentId, state.uid))
     }.sortedWith(compareBy<TaskRevision> { it.title.lowercase(java.util.Locale.ROOT) }.thenBy { it.taskId })
@@ -575,7 +594,11 @@ private fun TaskList(state: FamilyState, today: LocalDate, busy: Boolean, sectio
                             modifier = Modifier.weight(1f))
                         Icon(Icons.Default.ChevronRight, null, tint = GardenColors.Blue)
                     }
-                    Text(task.times.joinToString(" · ", transform = formats::time) + " · " + frequencyLabel(task.frequency))
+                    val timing = timings[task.taskId]
+                    if (task.frequency == Frequency.ONCE) Text(formats.date(timing?.date ?: task.start),
+                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    val times = if (task.frequency == Frequency.ONCE) timing?.times ?: task.times else task.times
+                    Text(times.sorted().joinToString(" · ", transform = formats::time) + " · " + frequencyLabel(task.frequency))
                     Text("Zuständig: ${responsibilityName(task.responsibleParentId, state.parents)}", style = MaterialTheme.typography.bodySmall)
                     if (historical) Text("Vergangene Ausführung", style = MaterialTheme.typography.bodySmall)
                     else if (!editableTask.active) Text("Pausiert", color = GardenColors.Coral, style = MaterialTheme.typography.bodySmall)
@@ -592,7 +615,7 @@ private fun TaskList(state: FamilyState, today: LocalDate, busy: Boolean, sectio
         item { EndOfPageFooter(GardenMotif.HEART) }
     }
     details?.let { selection ->
-        TaskDefinitionDialog(selection, state, busy, onDismiss = { details = null },
+        TaskDefinitionDialog(selection, state, busy, now, onDismiss = { details = null },
             onEdit = { details = null; onEdit(selection.editable) },
             onPause = { details = null; archive = selection.editable },
             onDelete = { details = null; onDelete(selection.task, selection.date) })
@@ -610,7 +633,7 @@ private fun frequencyLabel(frequency: Frequency) = when (frequency) {
 }
 
 @Composable
-private fun OccurrenceDialog(occurrence: Occurrence, state: FamilyState, today: LocalDate,
+private fun OccurrenceDialog(occurrence: Occurrence, state: FamilyState, today: LocalDate, now: Instant,
     onDismiss: () -> Unit, onComplete: (String) -> Unit, onUndo: () -> Unit,
     onEdit: () -> Unit, onDelete: () -> Unit) {
     val formats = rememberDateTimeFormats()
@@ -643,6 +666,7 @@ private fun OccurrenceDialog(occurrence: Occurrence, state: FamilyState, today: 
             DetailValue(if (completed.isEmpty()) Icons.Default.RadioButtonUnchecked else Icons.Default.CheckCircle, "Status",
                 if (completed.isEmpty()) "Noch nicht bestätigt" else "Erledigt")
         }
+        TaskCompletionOverview(occurrence.revision.taskId, state, now, occurrence.date)
         if (occurrence.revision.notes.isNotBlank()) DetailSection("Notizen", GardenColors.Cream) { Text(occurrence.revision.notes) }
         if (!visible) DetailNotice("Diese Ausführung wurde geändert, gelöscht oder verschoben. Bitte schließen und die Übersicht neu öffnen.")
         if (state.fromCache) DetailNotice("Gespeicherter Stand: Bestätigungen vom anderen Telefon sind möglicherweise noch nicht sichtbar.")
@@ -683,6 +707,7 @@ private fun Settings(state: FamilyState, busy: Boolean, onSignOut: () -> Unit, v
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(ReminderScheduler.enabled(context)) }
     var newTasks by remember { mutableStateOf(ActivityNotifications.enabled(context, state.uid, FamilyNoticeKind.NEW_TASK)) }
+    var taskCompletions by remember { mutableStateOf(ActivityNotifications.enabled(context, state.uid, FamilyNoticeKind.TASK_COMPLETED)) }
     var newAppointments by remember { mutableStateOf(ActivityNotifications.enabled(context, state.uid, FamilyNoticeKind.NEW_APPOINTMENT)) }
     var pendingPermission by rememberSaveable { mutableStateOf<String?>(null) }
     var showImpressum by rememberSaveable { mutableStateOf(false) }
@@ -699,6 +724,10 @@ private fun Settings(state: FamilyState, busy: Boolean, onSignOut: () -> Unit, v
             "tasks" -> {
                 newTasks = value
                 ActivityNotifications.setEnabled(context, state.uid, FamilyNoticeKind.NEW_TASK, value)
+            }
+            "completions" -> {
+                taskCompletions = value
+                ActivityNotifications.setEnabled(context, state.uid, FamilyNoticeKind.TASK_COMPLETED, value)
             }
             "appointments" -> {
                 newAppointments = value
@@ -735,13 +764,14 @@ private fun Settings(state: FamilyState, busy: Boolean, onSignOut: () -> Unit, v
         }
         item {
             SettingsSection("Darstellung", Icons.Default.Palette, GardenColors.Burgundy) {
-                SettingsToggle("Alltagsgedanken anzeigen", "Zeigt die wechselnden Texte in „Euer Alltagshelfer“ und „Eure Termine“.",
+                SettingsToggle("Alltagsgedanken anzeigen", "Zeigt die wechselnden Texte in Aufgaben, Termine, Einkaufsliste und Geschenkideen.",
                     showIntroductions, onShowIntroductionsChange)
                 HorizontalDivider()
                 SettingsToggle("Kalenderansicht anzeigen", "Zeigt den Kalender in Aufgaben und Termine.",
                     showCalendars, onShowCalendarsChange)
             }
         }
+        item { ListLabelSettings(state, vm, busy) }
         item {
             SettingsSection("Benachrichtigungen", Icons.Default.Notifications, GardenColors.Blue) {
                 SettingsToggle("Erinnerungen", "An deine fälligen Aufgaben und Termine – auch bei Zuständigkeit für beide Eltern.", enabled) {
@@ -750,6 +780,9 @@ private fun Settings(state: FamilyState, busy: Boolean, onSignOut: () -> Unit, v
                 HorizontalDivider()
                 SettingsToggle("Neue Aufgaben", "Wenn der andere Elternteil eine Aufgabe anlegt.", newTasks) {
                     changeNotificationChoice("tasks", it)
+                }
+                SettingsToggle("Aufgabe erledigt", "Wenn der andere Elternteil eine offene Aufgabe bestätigt – solange Kinderalltag läuft.", taskCompletions) {
+                    changeNotificationChoice("completions", it)
                 }
                 SettingsToggle("Neue Termine", "Wenn der andere Elternteil einen Termin anlegt.", newAppointments) {
                     changeNotificationChoice("appointments", it)
@@ -862,20 +895,20 @@ private fun TaskEditor(existing: TaskRevision?, children: List<Child>, parents: 
     val formats = rememberDateTimeFormats()
     val effective = today
     val single = selection?.scope == OperationScope.SINGLE
-    val id = remember { UUID.randomUUID().toString() }
-    val taskId = remember { existing?.taskId ?: UUID.randomUUID().toString() }
+    val id = rememberSaveable { UUID.randomUUID().toString() }
+    val taskId = rememberSaveable { existing?.taskId ?: UUID.randomUUID().toString() }
     var title by rememberSaveable { mutableStateOf(existing?.title ?: "") }
     var notes by rememberSaveable { mutableStateOf(existing?.notes ?: "") }
     var childId by rememberSaveable { mutableStateOf(existing?.childId ?: children.firstOrNull()?.id.orEmpty()) }
-    var responsibleParent by remember { mutableStateOf(existing?.responsibleParentId) }
-    var frequency by remember { mutableStateOf(if (single) Frequency.ONCE else existing?.frequency ?: Frequency.DAILY) }
-    var weekdays by remember { mutableStateOf(existing?.weekdays ?: emptySet()) }
-    var times by remember { mutableStateOf(if (single) listOf(requireNotNull(selection).occurrence.time) else existing?.times ?: listOf(LocalTime.of(8, 0))) }
-    var start by remember { mutableStateOf(if (single) requireNotNull(selection).occurrence.date else existing?.start?.let {
+    var responsibleParent by rememberSaveable { mutableStateOf(existing?.responsibleParentId) }
+    var frequency by rememberSaveable { mutableStateOf(if (single) Frequency.ONCE else existing?.frequency ?: Frequency.DAILY) }
+    var weekdays by rememberSaveable { mutableStateOf(existing?.weekdays ?: emptySet()) }
+    var times by rememberSaveable { mutableStateOf(if (single) listOf(requireNotNull(selection).occurrence.time) else existing?.times ?: listOf(LocalTime.of(8, 0))) }
+    var start by rememberSaveable { mutableStateOf(if (single) requireNotNull(selection).occurrence.date else existing?.start?.let {
         if (existing.frequency == Frequency.ONCE && it < effective) effective else it
     } ?: effective) }
-    var end by remember { mutableStateOf(existing?.end) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var end by rememberSaveable { mutableStateOf(existing?.end) }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false,
         dismissOnBackPress = !busy, dismissOnClickOutside = !busy)) {
         GardenBackground(Modifier.fillMaxSize()) {
@@ -891,13 +924,13 @@ private fun TaskEditor(existing: TaskRevision?, children: List<Child>, parents: 
                         }
                     }
                     if (existing != null) item { Text("Änderung gilt für: ${if (single) "nur diese Ausführung" else "diese und alle folgenden"}. Begonnene oder bestätigte Ausführungen bleiben erhalten.") }
-                    item { OutlinedTextField(title, { title = it }, label = { Text("Aufgabe") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                    item { DictationField(title, { title = it }, "Aufgabe", Modifier.fillMaxWidth(), enabled = !busy) }
                     item { Text("Für welchen Bereich?", style = MaterialTheme.typography.titleSmall) }
                     item { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         children.forEach { child -> GardenChildChip(child, childId == child.id) { childId = child.id } }
                     } }
                     item { AssignmentPicker(parents, responsibleParent) { responsibleParent = it } }
-                    item { OutlinedTextField(notes, { notes = it }, label = { Text("Notizen (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2) }
+                    item { DictationField(notes, { notes = it }, "Notizen (optional)", Modifier.fillMaxWidth(), notes = true, enabled = !busy) }
                     item { Text("Wiederholung", style = MaterialTheme.typography.titleSmall) }
                     if (!single) items(Frequency.entries) { value ->
                         Row(Modifier.fillMaxWidth().clickable { frequency = value }, verticalAlignment = Alignment.CenterVertically) {

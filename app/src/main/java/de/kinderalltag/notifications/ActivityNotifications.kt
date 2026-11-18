@@ -13,6 +13,7 @@ import android.os.Build
 import de.kinderalltag.MainActivity
 import de.kinderalltag.R
 import de.kinderalltag.data.FamilyState
+import de.kinderalltag.data.taskOccurrences
 import de.kinderalltag.domain.*
 
 object ActivityNotifications {
@@ -51,9 +52,15 @@ object ActivityNotifications {
             return
         }
         val ready = state.authorized && state.loaded && !state.fromCache && !state.pending && state.error == null
-        val notices = tracker.observe(uid, ready, state.revisions, state.appointmentActivity)
+        val notices = tracker.observe(uid, ready, state.revisions, state.appointmentActivity, state.events)
         val deleted = activeDeletions(state.itemOperations).filter { it.scope == OperationScope.ALL }
         fun isDeleted(kind: FamilyNoticeKind, id: String): Boolean {
+            if (kind == FamilyNoticeKind.TASK_COMPLETED) {
+                val occurrenceId = id.removePrefix("complete:")
+                val completion = Schedule.activeCompletions(state.events, occurrenceId).minWithOrNull(compareBy<CareEvent> { if (it.clientMillis > 0) it.clientMillis else it.serverMillis ?: 0 }.thenBy { it.id }) ?: return true
+                val date = completion.taskSnapshot?.date ?: completion.date
+                return state.taskOccurrences(date).none { it.id == occurrenceId }
+            }
             val type = if (kind == FamilyNoticeKind.NEW_TASK) ItemType.TASK else ItemType.APPOINTMENT
             val itemId = if (kind == FamilyNoticeKind.NEW_TASK) id.removePrefix("task:") else {
                 val event = state.appointmentActivity.firstOrNull { it.id == id.removePrefix("appointment:") } ?: return false
@@ -74,14 +81,23 @@ object ActivityNotifications {
             if (!enabled(context, uid, notice.kind) || !manager.areNotificationsEnabled()) return@forEach
             if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) return@forEach
-            val page = if (notice.kind == FamilyNoticeKind.NEW_TASK) "tasks" else "appointments"
+            val page = when (notice.kind) {
+                FamilyNoticeKind.NEW_TASK -> "tasks"
+                FamilyNoticeKind.NEW_APPOINTMENT -> "appointments"
+                FamilyNoticeKind.TASK_COMPLETED -> "home"
+            }
             val tag = "$TAG_PREFIX${notice.kind.name}:${notice.id}"
             val open = Intent(context, MainActivity::class.java).setData(Uri.parse("kinderalltag://activity/$page/${Uri.encode(notice.id)}"))
                 .putExtra("openPage", page).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            notice.occurrenceId?.let { open.putExtra("occurrence", it).putExtra("date", notice.date) }
             val tap = PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val author = state.parents.firstOrNull { it.id == notice.authorId }?.name ?: "Dein Partner"
             val notification = Notification.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(if (notice.kind == FamilyNoticeKind.NEW_TASK) "Neue Aufgabe" else "Neuer Termin")
+                .setContentTitle(when (notice.kind) {
+                    FamilyNoticeKind.NEW_TASK -> "Neue Aufgabe"
+                    FamilyNoticeKind.NEW_APPOINTMENT -> "Neuer Termin"
+                    FamilyNoticeKind.TASK_COMPLETED -> "Aufgabe erledigt"
+                })
                 .setContentText("$author: ${notice.title}").setContentIntent(tap).setAutoCancel(true)
                 .setVisibility(Notification.VISIBILITY_PRIVATE).build()
             manager.notify(tag, 0, notification)

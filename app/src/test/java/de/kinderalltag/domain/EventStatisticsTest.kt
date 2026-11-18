@@ -49,7 +49,7 @@ class EventStatisticsTest {
         assertEquals(0, result.total.events)
         assertEquals(0, result.total.completedTasks)
         assertEquals(listOf("a", "b"), result.parents.map { it.id })
-        assertEquals(listOf("ferdinand", "johann", "both", "haushalt"), result.subjects.map { it.id })
+        assertEquals(listOf("ferdinand", "johann", "both", "haushalt", "shopping"), result.subjects.map { it.id })
         assertEquals(DayOfWeek.entries.map { it.name }, result.weekdays.map { it.id })
         assertReconciles(result)
     }

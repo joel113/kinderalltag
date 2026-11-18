@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -194,22 +195,22 @@ private fun AppointmentEditor(target: AppointmentEditTarget, state: FamilyState,
     val seed = target.original?.details ?: target.imported?.series?.let { it.details.copy(date = it.activeFrom) }
     val singleException = target.original != null && !target.following
     val id = remember { UUID.randomUUID().toString() }
-    var title by remember { mutableStateOf(seed?.title.orEmpty()) }
-    var recipient by remember { mutableStateOf(seed?.recipient ?: AppointmentRecipient.FERDINAND) }
-    var parent by remember { mutableStateOf(seed?.responsibleParentId) }
-    var date by remember { mutableStateOf(seed?.date ?: LocalDate.now(FAMILY_ZONE).plusDays(1)) }
-    var start by remember { mutableStateOf(seed?.startTime ?: LocalTime.of(9, 0)) }
-    var end by remember { mutableStateOf(seed?.endTime ?: LocalTime.of(10, 0)) }
-    var allDay by remember { mutableStateOf(seed?.allDay ?: false) }
-    var location by remember { mutableStateOf(seed?.location.orEmpty()) }
-    var notes by remember { mutableStateOf(seed?.notes.orEmpty()) }
-    var reminder by remember { mutableStateOf(if (seed != null) seed.reminderMinutes else 30) }
-    var repeat by remember { mutableStateOf(if (singleException) AppointmentRepeat.ONCE else series?.repeat ?: AppointmentRepeat.ONCE) }
-    var interval by remember { mutableStateOf((series?.interval ?: 1).toString()) }
-    var until by remember { mutableStateOf(if (singleException) null else series?.until) }
+    var title by rememberSaveable { mutableStateOf(seed?.title.orEmpty()) }
+    var recipient by rememberSaveable { mutableStateOf(seed?.recipient ?: AppointmentRecipient.FERDINAND) }
+    var parent by rememberSaveable { mutableStateOf(seed?.responsibleParentId) }
+    var date by rememberSaveable { mutableStateOf(seed?.date ?: LocalDate.now(FAMILY_ZONE).plusDays(1)) }
+    var start by rememberSaveable { mutableStateOf(seed?.startTime ?: LocalTime.of(9, 0)) }
+    var end by rememberSaveable { mutableStateOf(seed?.endTime ?: LocalTime.of(10, 0)) }
+    var allDay by rememberSaveable { mutableStateOf(seed?.allDay ?: false) }
+    var location by rememberSaveable { mutableStateOf(seed?.location.orEmpty()) }
+    var notes by rememberSaveable { mutableStateOf(seed?.notes.orEmpty()) }
+    var reminder by rememberSaveable { mutableStateOf(if (seed != null) seed.reminderMinutes else 30) }
+    var repeat by rememberSaveable { mutableStateOf(if (singleException) AppointmentRepeat.ONCE else series?.repeat ?: AppointmentRepeat.ONCE) }
+    var interval by rememberSaveable { mutableStateOf((series?.interval ?: 1).toString()) }
+    var until by rememberSaveable { mutableStateOf(if (singleException) null else series?.until) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDraft by remember { mutableStateOf<AppointmentSeries?>(null) }
-    var importReviewed by remember { mutableStateOf(target.imported?.warnings.isNullOrEmpty()) }
+    var importReviewed by rememberSaveable { mutableStateOf(target.imported?.warnings.isNullOrEmpty()) }
     val duplicateImport = target.imported != null && state.appointmentOccurrences(date, date).any {
         it.details.title == title.trim() && it.details.allDay == allDay &&
             (allDay || (it.details.startTime == start && it.details.endTime == end))
@@ -239,7 +240,7 @@ private fun AppointmentEditor(target: AppointmentEditTarget, state: FamilyState,
                             }
                         }
                     }
-                    item { OutlinedTextField(title, { title = it }, label = { Text("Titel") }, modifier = Modifier.fillMaxWidth()) }
+                    item { DictationField(title, { title = it }, "Titel", Modifier.fillMaxWidth(), enabled = !busy) }
                     item { Text("Für welchen Bereich?", fontWeight = FontWeight.Bold) }
                     item { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppointmentRecipient.entries.forEach { value -> FilterChip(value == recipient, { recipient = value },
@@ -257,7 +258,7 @@ private fun AppointmentEditor(target: AppointmentEditTarget, state: FamilyState,
                         item { TimePickerField("Ende (gleicher Tag)", end, { end = it }, enabled = !busy) }
                     }
                     item { OutlinedTextField(location, { location = it }, label = { Text("Ort (optional)") }, modifier = Modifier.fillMaxWidth()) }
-                    item { OutlinedTextField(notes, { notes = it }, label = { Text("Notizen (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2) }
+                    item { DictationField(notes, { notes = it }, "Notizen (optional)", Modifier.fillMaxWidth(), notes = true, enabled = !busy) }
                     if (!singleException) {
                         if (target.following) item { Text("Bei unverändertem Datum und Intervall bleibt der ursprüngliche Rhythmus erhalten.") }
                         item { Text("Wiederholung", fontWeight = FontWeight.Bold) }
