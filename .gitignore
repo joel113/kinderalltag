@@ -17,3 +17,6 @@ node_modules/
 
 # Python hook-test bytecode
 __pycache__/
+
+# Local emulator test output
+firebase/result.log

@@ -13,15 +13,27 @@ data class CalendarEventCopy(
     val timeZoneId: String,
 )
 
-fun calendarEventCopy(occurrence: AppointmentOccurrence, recipientLabel: String): CalendarEventCopy {
+fun calendarEventCopy(
+    occurrence: AppointmentOccurrence,
+    recipientLabel: String,
+): CalendarEventCopy {
     val details = occurrence.details
     // Calendar all-day dates are UTC midnight boundaries, independent of Berlin's DST offset.
-    val start = if (details.allDay) details.date.atStartOfDay().toInstant(ZoneOffset.UTC) else details.startInstant
-    val end = if (details.allDay) details.date.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC) else details.endInstant
+    val start =
+        if (details.allDay) details.date.atStartOfDay().toInstant(ZoneOffset.UTC)
+        else details.startInstant
+    val end =
+        if (details.allDay) details.date.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)
+        else details.endInstant
     return CalendarEventCopy(
-        details.title, details.location,
-        listOf("Kinderalltag · $recipientLabel", details.notes).filter { it.isNotBlank() }.joinToString("\n\n"),
-        start.toEpochMilli(), end.toEpochMilli(), details.allDay,
+        details.title,
+        details.location,
+        listOf("Kinderalltag · $recipientLabel", details.notes)
+            .filter { it.isNotBlank() }
+            .joinToString("\n\n"),
+        start.toEpochMilli(),
+        end.toEpochMilli(),
+        details.allDay,
         if (details.allDay) "UTC" else FAMILY_ZONE.id,
     )
 }

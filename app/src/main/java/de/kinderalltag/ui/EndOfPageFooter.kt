@@ -15,15 +15,28 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun EndOfPageFooter(motif: GardenMotif, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 24.dp)
-        .semantics(mergeDescendants = true) {}, horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 24.dp).semantics(
+            mergeDescendants = true
+        ) {},
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Surface(shape = CircleShape, color = GardenColors.Cream.copy(alpha = 0.9f)) {
             GardenDrawing(motif, Modifier.padding(12.dp).size(56.dp))
         }
-        Text("Du bist am Ende angekommen.", style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold, color = GardenColors.Ink, textAlign = TextAlign.Center)
-        Text("Ein kleiner Moment zum Durchatmen.", style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(
+            "Du bist am Ende angekommen.",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = GardenColors.Ink,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            "Ein kleiner Moment zum Durchatmen.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }

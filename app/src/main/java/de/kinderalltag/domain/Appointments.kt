@@ -4,15 +4,28 @@ import java.time.*
 import java.time.temporal.ChronoUnit
 
 enum class AppointmentRecipient {
-    FERDINAND, JOHANN, BOTH_CHILDREN, HOUSEHOLD;
-    fun matches(sectionId: String?): Boolean = sectionId == null || when (this) {
-        FERDINAND -> sectionId == "ferdinand"
-        JOHANN -> sectionId == "johann"
-        BOTH_CHILDREN -> sectionId == "ferdinand" || sectionId == "johann"
-        HOUSEHOLD -> sectionId == "haushalt"
-    }
+    FERDINAND,
+    JOHANN,
+    BOTH_CHILDREN,
+    HOUSEHOLD;
+
+    fun matches(sectionId: String?): Boolean =
+        sectionId == null ||
+            when (this) {
+                FERDINAND -> sectionId == "ferdinand"
+                JOHANN -> sectionId == "johann"
+                BOTH_CHILDREN -> sectionId == "ferdinand" || sectionId == "johann"
+                HOUSEHOLD -> sectionId == "haushalt"
+            }
 }
-enum class AppointmentRepeat { ONCE, DAYS, WEEKS, MONTHS, YEARS }
+
+enum class AppointmentRepeat {
+    ONCE,
+    DAYS,
+    WEEKS,
+    MONTHS,
+    YEARS,
+}
 
 data class AppointmentDetails(
     val title: String,
@@ -26,21 +39,41 @@ data class AppointmentDetails(
     val notes: String = "",
     val reminderMinutes: Int? = 30,
 ) {
-    val startInstant: Instant get() = date.atTime(if (allDay) LocalTime.MIDNIGHT else startTime).atZone(FAMILY_ZONE).toInstant()
-    val endInstant: Instant get() {
-        if (allDay) return date.plusDays(1).atStartOfDay(FAMILY_ZONE).toInstant()
-        val resolved = date.atTime(endTime).atZone(FAMILY_ZONE).toInstant()
-        return if (resolved > startInstant) resolved else startInstant.plus(Duration.between(startTime, endTime))
-    }
-    val reminderInstant: Instant? get() = reminderMinutes?.let {
-        (if (allDay) date.atTime(9, 0).atZone(FAMILY_ZONE).toInstant() else startInstant).minusSeconds(it * 60L)
-    }
+    val startInstant: Instant
+        get() =
+            date
+                .atTime(if (allDay) LocalTime.MIDNIGHT else startTime)
+                .atZone(FAMILY_ZONE)
+                .toInstant()
+
+    val endInstant: Instant
+        get() {
+            if (allDay) return date.plusDays(1).atStartOfDay(FAMILY_ZONE).toInstant()
+            val resolved = date.atTime(endTime).atZone(FAMILY_ZONE).toInstant()
+            return if (resolved > startInstant) resolved
+            else startInstant.plus(Duration.between(startTime, endTime))
+        }
+
+    val reminderInstant: Instant?
+        get() =
+            reminderMinutes?.let {
+                (if (allDay) date.atTime(9, 0).atZone(FAMILY_ZONE).toInstant() else startInstant)
+                    .minusSeconds(it * 60L)
+            }
+
     fun validate() {
         require(title.isNotBlank() && title.length <= 120) { "Titel: 1 bis 120 Zeichen." }
         require(location.length <= 300 && notes.length <= 2000) { "Ort oder Notizen sind zu lang." }
-        require(allDay || endTime > startTime) { "Das Ende muss nach dem Beginn liegen (am selben Tag)." }
-        require(listOf(startTime, endTime).all { it.second == 0 && it.nano == 0 }) { "Bitte minutengenaue Uhrzeiten verwenden." }
-        require(reminderMinutes == null || reminderMinutes in if (allDay) listOf(0, 1440) else listOf(0, 15, 30, 60, 1440)) {
+        require(allDay || endTime > startTime) {
+            "Das Ende muss nach dem Beginn liegen (am selben Tag)."
+        }
+        require(listOf(startTime, endTime).all { it.second == 0 && it.nano == 0 }) {
+            "Bitte minutengenaue Uhrzeiten verwenden."
+        }
+        require(
+            reminderMinutes == null ||
+                reminderMinutes in if (allDay) listOf(0, 1440) else listOf(0, 15, 30, 60, 1440)
+        ) {
             "Bitte eine gültige Erinnerung auswählen."
         }
     }
@@ -60,53 +93,75 @@ data class AppointmentSeries(
     val createdMillis: Long = 0,
     val rootId: String? = null,
 ) {
-    val activeFrom: LocalDate get() = fromDate ?: details.date
+    val activeFrom: LocalDate
+        get() = fromDate ?: details.date
+
     fun validate() {
         details.validate()
         require(interval in 1..1000) { "Intervall: 1 bis 1000." }
-        require(repeat != AppointmentRepeat.ONCE || interval == 1) { "Einmalige Termine haben kein Intervall." }
-        require(activeFrom >= details.date) { "Der Serienbeginn liegt vor dem Rhythmusbeginn." }
-        require(until == null || until >= activeFrom) { "Das Enddatum liegt vor dem ersten Termin." }
-        require(copy(cutoff = null).contains(activeFrom)) { "Der Serienbeginn passt nicht zum Intervall." }
-    }
-    fun dateAt(index: Long): LocalDate = when (repeat) {
-        AppointmentRepeat.ONCE -> details.date
-        AppointmentRepeat.DAYS -> details.date.plusDays(index * interval)
-        AppointmentRepeat.WEEKS -> details.date.plusWeeks(index * interval)
-        AppointmentRepeat.MONTHS -> details.date.plusMonths(index * interval)
-        AppointmentRepeat.YEARS -> details.date.plusYears(index * interval)
-    }
-    private fun nearIndex(date: LocalDate): Long {
-        val units = when (repeat) {
-            AppointmentRepeat.ONCE -> 0
-            AppointmentRepeat.DAYS -> ChronoUnit.DAYS.between(details.date, date)
-            AppointmentRepeat.WEEKS -> ChronoUnit.WEEKS.between(details.date, date)
-            AppointmentRepeat.MONTHS -> ChronoUnit.MONTHS.between(YearMonth.from(details.date), YearMonth.from(date))
-            AppointmentRepeat.YEARS -> (date.year - details.date.year).toLong()
+        require(repeat != AppointmentRepeat.ONCE || interval == 1) {
+            "Einmalige Termine haben kein Intervall."
         }
+        require(activeFrom >= details.date) { "Der Serienbeginn liegt vor dem Rhythmusbeginn." }
+        require(until == null || until >= activeFrom) {
+            "Das Enddatum liegt vor dem ersten Termin."
+        }
+        require(copy(cutoff = null).contains(activeFrom)) {
+            "Der Serienbeginn passt nicht zum Intervall."
+        }
+    }
+
+    fun dateAt(index: Long): LocalDate =
+        when (repeat) {
+            AppointmentRepeat.ONCE -> details.date
+            AppointmentRepeat.DAYS -> details.date.plusDays(index * interval)
+            AppointmentRepeat.WEEKS -> details.date.plusWeeks(index * interval)
+            AppointmentRepeat.MONTHS -> details.date.plusMonths(index * interval)
+            AppointmentRepeat.YEARS -> details.date.plusYears(index * interval)
+        }
+
+    private fun nearIndex(date: LocalDate): Long {
+        val units =
+            when (repeat) {
+                AppointmentRepeat.ONCE -> 0
+                AppointmentRepeat.DAYS -> ChronoUnit.DAYS.between(details.date, date)
+                AppointmentRepeat.WEEKS -> ChronoUnit.WEEKS.between(details.date, date)
+                AppointmentRepeat.MONTHS ->
+                    ChronoUnit.MONTHS.between(YearMonth.from(details.date), YearMonth.from(date))
+                AppointmentRepeat.YEARS -> (date.year - details.date.year).toLong()
+            }
         return maxOf(0, units / interval - 1)
     }
+
     fun nextDate(from: LocalDate): LocalDate? {
         var index = nearIndex(maxOf(from, activeFrom))
         repeat(4) {
             val candidate = dateAt(index++)
-            if ((until != null && candidate > until) || (cutoff != null && candidate >= cutoff)) return null
+            if ((until != null && candidate > until) || (cutoff != null && candidate >= cutoff))
+                return null
             if (candidate >= from && candidate >= activeFrom) return candidate
             if (repeat == AppointmentRepeat.ONCE) return null
         }
         return null
     }
+
     fun contains(date: LocalDate): Boolean = datesBetween(date, date).isNotEmpty()
+
     fun datesBetween(from: LocalDate, to: LocalDate): List<LocalDate> {
         if (to < from || to < details.date) return emptyList()
-        if (repeat == AppointmentRepeat.ONCE) return listOf(details.date).filter {
-            it in from..to && it >= activeFrom && (until == null || it <= until) && (cutoff == null || it < cutoff)
-        }
+        if (repeat == AppointmentRepeat.ONCE)
+            return listOf(details.date).filter {
+                it in from..to &&
+                    it >= activeFrom &&
+                    (until == null || it <= until) &&
+                    (cutoff == null || it < cutoff)
+            }
         val dates = mutableListOf<LocalDate>()
         var index = nearIndex(maxOf(from, activeFrom))
         while (true) {
             val date = dateAt(index++)
-            if (date > to || (until != null && date > until) || (cutoff != null && date >= cutoff)) break
+            if (date > to || (until != null && date > until) || (cutoff != null && date >= cutoff))
+                break
             if (date >= from && date >= activeFrom) dates += date
         }
         return dates
@@ -121,40 +176,91 @@ data class AppointmentException(
     val authorId: String = "",
     val updatedMillis: Long = 0,
 ) {
-    val id: String get() = "${seriesId}_$originalDate"
+    val id: String
+        get() = "${seriesId}_$originalDate"
 }
-data class AppointmentOccurrence(val series: AppointmentSeries, val originalDate: LocalDate, val details: AppointmentDetails,
-    val sourceSeriesId: String = series.id, val originTime: LocalTime = if (series.details.allDay) LocalTime.MIDNIGHT else series.details.startTime) {
-    val id: String get() = "appointment_${sourceSeriesId}_$originalDate"
+
+data class AppointmentOccurrence(
+    val series: AppointmentSeries,
+    val originalDate: LocalDate,
+    val details: AppointmentDetails,
+    val sourceSeriesId: String = series.id,
+    val originTime: LocalTime =
+        if (series.details.allDay) LocalTime.MIDNIGHT else series.details.startTime,
+) {
+    val id: String
+        get() = "appointment_${sourceSeriesId}_$originalDate"
 }
 
 object AppointmentSchedule {
-    fun canSplit(series: AppointmentSeries, boundary: LocalDate, exceptions: List<AppointmentException>, now: Instant): Boolean =
-        exceptions.none { it.seriesId == series.id && it.originalDate >= boundary && series.contains(it.originalDate) &&
-            it.replacement?.let { details -> details.startInstant <= now } == true }
+    fun canSplit(
+        series: AppointmentSeries,
+        boundary: LocalDate,
+        exceptions: List<AppointmentException>,
+        now: Instant,
+    ): Boolean =
+        exceptions.none {
+            it.seriesId == series.id &&
+                it.originalDate >= boundary &&
+                series.contains(it.originalDate) &&
+                it.replacement?.let { details -> details.startInstant <= now } == true
+        }
 
-    fun find(id: String, series: List<AppointmentSeries>, exceptions: List<AppointmentException>): AppointmentOccurrence? {
+    fun find(
+        id: String,
+        series: List<AppointmentSeries>,
+        exceptions: List<AppointmentException>,
+    ): AppointmentOccurrence? {
         if (!id.startsWith("appointment_")) return null
         val key = id.removePrefix("appointment_")
-        val original = runCatching { LocalDate.parse(key.substringAfterLast('_')) }.getOrNull() ?: return null
-        val item = series.firstOrNull { it.id == key.substringBeforeLast('_') && it.contains(original) } ?: return null
-        val exception = exceptions.firstOrNull { it.seriesId == item.id && it.originalDate == original }
-        val details = if (exception != null) exception.replacement else item.details.copy(date = original)
+        val original =
+            runCatching { LocalDate.parse(key.substringAfterLast('_')) }.getOrNull() ?: return null
+        val item =
+            series.firstOrNull { it.id == key.substringBeforeLast('_') && it.contains(original) }
+                ?: return null
+        val exception =
+            exceptions.firstOrNull { it.seriesId == item.id && it.originalDate == original }
+        val details =
+            if (exception != null) exception.replacement else item.details.copy(date = original)
         return details?.let { AppointmentOccurrence(item, original, it) }
     }
-    fun occurrences(series: List<AppointmentSeries>, exceptions: List<AppointmentException>,
-        from: LocalDate, to: LocalDate): List<AppointmentOccurrence> {
+
+    fun occurrences(
+        series: List<AppointmentSeries>,
+        exceptions: List<AppointmentException>,
+        from: LocalDate,
+        to: LocalDate,
+    ): List<AppointmentOccurrence> {
         val overrides = exceptions.associateBy { it.id }
-        return series.flatMap { item ->
-            // Also inspect moved-in appointments whose original dates fall outside this window.
-            val candidates = (item.datesBetween(from, to) + exceptions.filter { it.seriesId == item.id &&
-                it.replacement?.date?.let { date -> date in from..to } == true }.map { it.originalDate }).distinct()
-            candidates.filter { item.contains(it) }.mapNotNull { original ->
-                val exception = overrides["${item.id}_$original"]
-                val details = if (exception != null) exception.replacement else item.details.copy(date = original)
-                details?.takeIf { it.date in from..to }?.let { AppointmentOccurrence(item, original, it) }
+        return series
+            .flatMap { item ->
+                // Also inspect moved-in appointments whose original dates fall outside this window.
+                val candidates =
+                    (item.datesBetween(from, to) +
+                            exceptions
+                                .filter {
+                                    it.seriesId == item.id &&
+                                        it.replacement?.date?.let { date -> date in from..to } ==
+                                            true
+                                }
+                                .map { it.originalDate })
+                        .distinct()
+                candidates
+                    .filter { item.contains(it) }
+                    .mapNotNull { original ->
+                        val exception = overrides["${item.id}_$original"]
+                        val details =
+                            if (exception != null) exception.replacement
+                            else item.details.copy(date = original)
+                        details
+                            ?.takeIf { it.date in from..to }
+                            ?.let { AppointmentOccurrence(item, original, it) }
+                    }
             }
-        }.sortedWith(compareBy<AppointmentOccurrence> { it.details.date }
-            .thenBy { if (it.details.allDay) LocalTime.MIDNIGHT else it.details.startTime }.thenBy { it.id })
+            .sortedWith(
+                compareBy<AppointmentOccurrence> { it.details.date }
+                    .thenBy { if (it.details.allDay) LocalTime.MIDNIGHT else it.details.startTime }
+                    .thenBy { it.id }
+            )
     }
 }

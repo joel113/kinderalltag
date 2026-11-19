@@ -54,6 +54,22 @@ test('definitions are validated and immutable', async () => {
     await assertFails(setDoc(doc(db, `${path}/revisions/bad-${index}`), { ...revision('parent-a'), ...extra }));
   }
 });
+
+test('time arrays retain strict slot boundaries, types, uniqueness and the eight-slot limit', async () => {
+  const db = dbFor('parent-a');
+  const times = ['00:00', '06:00', '08:00', '10:00', '12:00', '16:00', '18:00', '23:59'];
+  for (let count = 1; count <= 8; count++) await assertSucceeds(setDoc(doc(db, `${path}/revisions/slots-${count}`),
+    { ...revision('parent-a'), times: times.slice(0, count) }));
+  for (const [index, invalid] of [
+    [], [...times, '23:58'], ['08:00', '08:00'], ['08:00,09:00'], ['08:00,09:00', '10:00'],
+    ['08:0', '09:000'], ['08:00:01'], ['24:00'], [null], [true], [800], [8.5], [{ value: '08:00' }],
+    [...times.slice(0, 7), '24:00'],
+  ].entries()) await assertFails(setDoc(doc(db, `${path}/revisions/bad-slots-${index}`),
+    { ...revision('parent-a'), times: invalid }));
+  // Nested arrays cannot reach Firestore rules: the SDK rejects them synchronously.
+  assert.throws(() => setDoc(doc(db, `${path}/revisions/nested-slots`),
+    { ...revision('parent-a'), times: [['08:00']] }), { code: 'invalid-argument' });
+});
 test('either parent can acknowledge and retract while preserving audit records', async () => {
   const a = dbFor('parent-a'), b = dbFor('parent-b');
   await assertSucceeds(setDoc(doc(a, `${path}/events/e1`), event('parent-a')));
@@ -485,6 +501,50 @@ test('label groups and six-label snapshots are validated within Firestore access
   await assertFails(createFamilyList(db, 'parent-a', familyListItem('wrong-snapshot', 'GIFTS', { labelIds: [labels[0].id] }), { labels: [labels[1]] }));
 });
 
+test('six-label items support edits, purchases and reopenings by either parent', async () => {
+  const a = dbFor('parent-a'), b = dbFor('parent-b');
+  for (const kind of ['SHOPPING', 'GIFTS']) {
+    const labels = Array.from({ length: 6 }, (_, index) => familyLabel(`${kind}-${index}`,
+      kind === 'SHOPPING' ? 'SHOPPING' : index < 3 ? 'OCCASION' : 'GIVER'));
+    for (const label of labels) await assertSucceeds(setDoc(doc(a, `${path}/listLabels/${label.id}`), label));
+    const item = familyListItem(`full-${kind}`, kind, { labelIds: labels.map(label => label.id) });
+    await assertSucceeds(createFamilyList(a, 'parent-a', item, { labels }));
+    const changed = { ...item, title: 'Geändert', version: 1, lastActivityId: `change-${kind}` };
+    await assertSucceeds(changeFamilyList(b, 'parent-b', changed, 'CHANGED', { labels }));
+    await assertSucceeds(setDoc(doc(a, `${path}/listActivity/buy-${kind}`),
+      listAudit('parent-a', changed, 'BOUGHT', `buy-${kind}`, { labels })));
+    await assertSucceeds(setDoc(doc(b, `${path}/listActivity/reopen-${kind}`),
+      listAudit('parent-b', changed, 'REOPENED', `reopen-${kind}`, { labels, targetId: `buy-${kind}` })));
+    await assertSucceeds(setDoc(doc(b, `${path}/listActivity/late-${kind}`),
+      listAudit('parent-b', item, 'BOUGHT', `late-${kind}`, { labels })));
+    for (const label of labels) await assertSucceeds(setDoc(doc(a, `${path}/listLabels/${label.id}`),
+      { ...label, name: 'Umbenannt', color: 'ROSE', active: false, version: 1 }));
+    await assertSucceeds(setDoc(doc(b, `${path}/listActivity/archived-${kind}`),
+      listAudit('parent-b', item, 'BOUGHT', `archived-${kind}`, { labels })));
+    for (const [index, invalid] of [
+      { ...labels[0], color: 'INVALID' }, { ...labels[0], name: '' }, { ...labels[0], unexpected: true },
+    ].entries()) await assertFails(setDoc(doc(a, `${path}/listActivity/bad-label-${kind}-${index}`),
+      listAudit('parent-a', changed, 'BOUGHT', `bad-label-${kind}-${index}`, { labels: [invalid, ...labels.slice(1)] })));
+  }
+});
+
+test('audit provenance cannot bypass item schema validation or atomic pairing', async () => {
+  const db = dbFor('parent-a');
+  const item = familyListItem();
+  await assertSucceeds(createFamilyList(db, 'parent-a', item));
+  for (const [index, extra] of [{ unexpected: true }, { title: '' }, { responsibleParentId: 'parent-a' }, { labelIds: ['missing'] }].entries()) {
+    const id = `invalid-pair-${index}`;
+    const invalid = { ...item, ...extra, version: 1, lastActivityId: id };
+    await assertFails(changeFamilyList(db, 'parent-a', invalid, 'CHANGED'));
+    await assertFails(setDoc(doc(db, `${path}/listActivity/invalid-buy-${index}`),
+      listAudit('parent-a', { ...item, ...extra }, 'BOUGHT', `invalid-buy-${index}`)));
+  }
+  await assertFails(setDoc(doc(db, `${path}/listActivity/unpaired-change`),
+    listAudit('parent-a', item, 'CHANGED', 'unpaired-change')));
+  await assertFails(setDoc(doc(db, `${path}/listActivity/repeated-add`),
+    listAudit('parent-a', item, 'ADDED', 'repeated-add')));
+});
+
 
 test('purchase snapshots must reference an actual immutable item version', async () => {
   const db = dbFor('parent-a');
@@ -496,4 +556,67 @@ test('purchase snapshots must reference an actual immutable item version', async
   await assertSucceeds(changeFamilyList(db, 'parent-a', changed, 'CHANGED'));
   await assertSucceeds(setDoc(doc(db, `${path}/listActivity/old-offline-version`), listAudit('parent-a', item, 'BOUGHT', 'old-offline-version')));
   assert.equal((await getDoc(doc(db, `${path}/listActivity/old-offline-version`))).data().snapshot.title, 'Milch');
+});
+
+// Exercise the full Android completion shape, including credited-parent fields and snapshots.
+test('both parents can confirm unedited legacy tasks with empty slot origins and delegated credit', async () => {
+  const db = dbFor('parent-a');
+  await seedOperationSource(db);
+  const occurrenceId = 'task-1_source_2026-11-19_28800';
+  const snapshot = { revision: { ...taskSnapshot(), slotOrigins: [] }, date: '2026-11-19', time: '08:00', id: occurrenceId,
+    originalDate: '2026-11-19', originalTime: '08:00', sourceId: 'source' };
+  for (const uid of ['parent-a', 'parent-b']) {
+    for (const credited of ['parent-a', 'parent-b']) {
+      await assertSucceeds(setDoc(doc(dbFor(uid), `${path}/events/full-${uid}-${credited}`), event(uid, {
+        date: snapshot.date, occurrenceId, completedById: credited, completedByName: 'Elternteil', taskSnapshot: snapshot,
+      })));
+    }
+  }
+  await assertFails(setDoc(doc(dbFor('stranger'), `${path}/events/stranger-confirm`), event('stranger', {
+    date: snapshot.date, occurrenceId, completedById: 'parent-a', completedByName: 'Elternteil', taskSnapshot: snapshot,
+  })));
+});
+
+test('full eight-slot edited snapshots and correction batches fit the completion validation path', async () => {
+  const db = dbFor('parent-a');
+  await seedOperationSource(db);
+  const times = ['00:00', '06:00', '08:00', '10:00', '12:00', '16:00', '18:00', '23:59'];
+  const seconds = [0, 21600, 28800, 36000, 43200, 57600, 64800, 86340];
+  const occurrenceId = 'task-1_source_2026-11-19_64800';
+  const snapshot = { revision: { ...taskSnapshot(), id: 'edited-draft', times, slotOrigins: seconds.map(value => `source|${value}`),
+    responsibleParentId: 'parent-b', weekdays: [1, 2, 3, 4, 5, 6, 7] },
+    date: '2026-11-19', time: '18:00', id: occurrenceId, originalDate: '2026-11-19', originalTime: '18:00', sourceId: 'source' };
+  for (const uid of ['parent-a', 'parent-b']) {
+    await assertSucceeds(setDoc(doc(dbFor(uid), `${path}/events/eight-${uid}`), event(uid, { date: snapshot.date,
+      occurrenceId, completedById: 'parent-b', completedByName: 'Mama', taskSnapshot: snapshot })));
+  }
+  const correction = writeBatch(db);
+  for (const uid of ['parent-a', 'parent-b']) correction.set(doc(db, `${path}/events/undo-eight-${uid}`), event('parent-a', {
+    kind: 'RETRACT', date: snapshot.date, occurrenceId, targetId: `eight-${uid}`, taskSnapshot: snapshot,
+  }));
+  await assertSucceeds(correction.commit());
+});
+
+test('completion snapshots enforce time, field, source and credit validation', async () => {
+  const db = dbFor('parent-a');
+  await seedOperationSource(db);
+  const occurrenceId = 'task-1_source_2026-11-19_28800';
+  const snapshot = { revision: { ...taskSnapshot(), slotOrigins: [] }, date: '2026-11-19', time: '08:00', id: occurrenceId,
+    originalDate: '2026-11-19', originalTime: '08:00', sourceId: 'source' };
+  for (const [index, changes] of [
+    { time: '25:00' }, { originalTime: '08:00:01' }, { sourceId: 'missing' }, { date: '2026-11-18' },
+    { revision: { ...snapshot.revision, unexpected: true } },
+    { revision: { ...snapshot.revision, slotOrigins: ['source|999999'] } },
+    { revision: { ...snapshot.revision, slotOrigins: ['source|28800', 'source|64800'] } },
+    { revision: { ...snapshot.revision, times: ['08:00', '08:00'] } },
+    { revision: { ...snapshot.revision, times: ['08:00,09:00'] } },
+    { revision: { ...snapshot.revision, times: Array(8).fill('08:00'), slotOrigins: [] } },
+    { revision: { ...snapshot.revision, times: ['00:00', '06:00', '08:00', '10:00', '12:00', '16:00', '18:00', '23:59'],
+      slotOrigins: ['source|0', 'source|21600', 'source|28800', 'source|36000', 'source|43200', 'source|57600', 'source|64800', 'source|999999'] } },
+  ].entries()) await assertFails(setDoc(doc(db, `${path}/events/invalid-completion-${index}`), event('parent-a', {
+    date: snapshot.date, occurrenceId, taskSnapshot: { ...snapshot, ...changes },
+  })));
+  await assertFails(setDoc(doc(db, `${path}/events/forged-credit`), event('parent-a', {
+    date: snapshot.date, occurrenceId, taskSnapshot: snapshot, completedById: 'stranger', completedByName: 'Fremd',
+  })));
 });

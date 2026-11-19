@@ -4,12 +4,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ChildTest {
-    @Test fun existingProfilesHaveDistinctDefaultColors() {
+    @Test
+    fun existingProfilesHaveDistinctDefaultColors() {
         assertEquals(BearColor.BLUE, Child("ferdinand", "Ferdinand").bearColor)
         assertEquals(BearColor.ROSE, Child("johann", "Johann").bearColor)
     }
 
-    @Test fun savedColorsRoundTripAndUnknownColorsFallBack() {
+    @Test
+    fun savedColorsRoundTripAndUnknownColorsFallBack() {
         BearColor.entries.forEach { color ->
             assertEquals(color, BearColor.fromStored(color.name, "johann"))
         }

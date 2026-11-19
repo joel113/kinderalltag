@@ -18,6 +18,16 @@ npx firebase emulators:exec --config ../firebase.json --project demo-kinderallta
 
 ## Two-phone acceptance
 
+### Rejected-write regression checks
+
+Firestore's 1,000-expression evaluation limit previously rejected valid task confirmations, task/appointment edits, and six-label shopping/gift writes. The rules now use bounded time-list validation, exact schema checks without duplicate field lists, and atomic-item or immutable-history pairing for audit snapshots. Current label snapshots reuse validated stored labels; historical labels validate presentation differences. Membership restrictions and immutable audit history remain enforced.
+
+All **36 emulator tests pass**, covering full Android confirmation snapshots, delegated parent credit, eight-slot correction batches, six-label edits/purchases with archived labels, malformed time arrays, and attempts to bypass item validation through audit records. Publish the complete `firebase/firestore.rules` before the two-phone confirmation check; no data migration is required.
+
+Task-confirmation errors remain visible in the details dialog. Logcat tag `KinderalltagCare` records error codes and source/cache flags without task contents. When investigating access failures, verify the Firebase project, membership document and App Check configuration. Cached content alone does not prove server access. The temporary Settings access-check UI has been removed.
+
+Final local validation passed: `./gradlew spotlessApply spotlessCheck :app:testDebugUnitTest :app:lintDebug :app:assembleDebug` and the complete demo Firestore emulator suite. All 185 Android JVM tests and all 36 rules tests pass. The repository's configured Spotless formatter was applied to existing Kotlin sources and Gradle scripts. Physical two-phone behavior remains a manual acceptance check.
+
 Use a test Firebase project with two provisioned accounts and an unrelated third account.
 
 1. Create daily Johann tasks at two times and a Ferdinand one-off. Confirm they appear on both phones, grouped independently.
