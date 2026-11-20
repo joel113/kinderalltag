@@ -13,6 +13,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  workflows:
+    name: Format and lint GitHub Actions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Install workflow check tools
+        run: ./scripts/install-dev-tools.sh
+      - name: Check workflow formatting and lint
+        run: npm run check:workflows
+
   android:
     name: Format, lint, test and build
     runs-on: ubuntu-24.04

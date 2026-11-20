@@ -17,4 +17,4 @@ fi
 
 chmod +x .githooks/pre-commit
 git config --local core.hooksPath .githooks
-echo 'Enabled pre-commit formatting and Android lint for this checkout.'
+echo 'Enabled app and workflow pre-commit formatting/lint checks for this checkout.'

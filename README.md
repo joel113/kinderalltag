@@ -51,11 +51,19 @@ The emulator tests only use the `demo-kinderalltag` project; they must never tar
 Formatting uses [Spotless](https://github.com/diffplug/spotless/tree/main/plugin-gradle) with ktfmt's four-space Kotlin style for app/test Kotlin and Gradle Kotlin scripts.
 
 ```sh
-./gradlew spotlessApply          # Format sources and build scripts
-./gradlew spotlessCheck          # Check formatting without changing files
-./scripts/install-hooks.sh      # Enable the repository's pre-commit hook once per checkout
+./gradlew spotlessApply          # Format app/test Kotlin and Gradle scripts
+./gradlew spotlessCheck          # Check app formatting
+./scripts/install-dev-tools.sh  # Install pinned workflow tools (Node 20+, Go 1.25+)
+./scripts/install-hooks.sh      # Enable both pre-commit checks once per checkout
+npm run format:workflows        # Format tracked GitHub Actions YAML
+npm run check:workflows         # Check YAML formatting and actionlint rules
 ```
 
-The hook formats and runs Android lint for app/build changes. It refuses unstaged Android changes, never auto-stages files, and stops for review if formatting changes anything. Stage the reviewed files and commit again. It requires the same JDK/SDK as a normal build; the first run needs dependency downloads. Existing hooks are preserved by the installer.
+The combined pre-commit hook runs two independent checks when relevant files are staged:
 
-[Android checks](.github/workflows/android.yml) runs on pushes, pull requests and manual dispatch: formatting, lint, JVM tests, debug compilation, hook tests and demo Firestore rules tests. Reports, a formatting patch and the setup-screen debug APK are uploaded as artifacts. CI flags uncommitted formatting changes; run `spotlessApply` locally or review/apply the uploaded patch. No Firebase configuration or signing secrets are required. See [TESTING.md](docs/TESTING.md) for details and local validation limits.
+- **App:** Spotless formatting and Android lint for app/build changes, using the usual JDK/SDK.
+- **GitHub Actions:** Prettier 3.6.2 formatting and actionlint 1.7.12 validation for workflows/tooling changes. Workflow-only commits need Node.js and the local tools, without Gradle or an Android SDK. actionlint's optional ShellCheck/Pyflakes integrations are disabled consistently locally and in CI.
+
+Both checks refuse unstaged changes in their own scope before formatting, never auto-stage files, and stop for review if formatting changes anything. Stage the reviewed files and commit again. Untracked workflow drafts are left alone; stage a new workflow before running the workflow formatter. Documentation/backend-only commits skip both toolchains. The installer preserves existing hook configurations. Workflow tools download during installation; the hook never installs them automatically. Gradle may resolve its usual dependencies during the first app check. Local actionlint binaries live in ignored `.tools/bin/`.
+
+[Android checks](.github/workflows/android.yml) runs on pushes, pull requests and manual dispatch: formatting, lint, JVM tests, debug compilation, hook tests, workflow formatting/actionlint, and demo Firestore rules tests. Reports, a formatting patch and the setup-screen debug APK are uploaded as artifacts. CI flags uncommitted formatting changes; run `spotlessApply` locally or review/apply the uploaded patch. No Firebase configuration or signing secrets are required. See [TESTING.md](docs/TESTING.md) for details and local validation limits.

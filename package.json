@@ -1,0 +1,11 @@
+{
+  "name": "kinderalltag-dev-tools",
+  "private": true,
+  "scripts": {
+    "format:workflows": "sh scripts/check-workflows.sh --write",
+    "check:workflows": "sh scripts/check-workflows.sh --check"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}

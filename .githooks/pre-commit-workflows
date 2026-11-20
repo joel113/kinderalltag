@@ -1,0 +1,30 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+set -- "${1:-run}" .github/workflows .github/actionlint.yaml .github/actionlint.yml \
+    .editorconfig .prettierrc.json .prettierignore package.json package-lock.json \
+    scripts/check-workflows.sh scripts/install-dev-tools.sh .githooks
+mode=$1
+shift
+
+if git diff --cached --quiet -- "$@"; then
+    exit 0
+fi
+if ! git diff --quiet -- "$@"; then
+    echo 'Pre-commit: stage or stash unstaged workflow/tooling changes before formatting.' >&2
+    echo 'No workflow files have been formatted or staged by this hook.' >&2
+    exit 1
+fi
+if [ "$mode" = '--preflight' ]; then
+    exit 0
+fi
+
+sh scripts/check-workflows.sh --write
+if ! git diff --quiet -- "$@"; then
+    echo 'Pre-commit: workflow formatting updated files. Review and stage the changes, then commit again.' >&2
+    exit 1
+fi
+sh scripts/check-workflows.sh --check

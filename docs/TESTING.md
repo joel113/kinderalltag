@@ -158,16 +158,26 @@ CalendarEventCopyTest covers current moved details, Berlin timed instants, all-d
 
 A separate Firestore job installs the pinned direct npm dependencies and runs the existing tests against `demo-kinderalltag` only. It needs no service account or production Firebase credentials. Dependency downloads and a network-enabled GitHub runner are required.
 
-Before committing, run `./scripts/install-hooks.sh` once. The tracked `.githooks/pre-commit` runs `spotlessApply`, `spotlessCheck` and `:app:lintDebug` for Android/build changes. Documentation/backend-only changes skip Gradle. Unstaged Android/build edits block the hook before formatting, so partially staged content is preserved. Formatting changes are left for review and explicit staging; the hook never stages files. If another hook configuration exists, the installer refuses to replace it. Run the hook manually with `.githooks/pre-commit` after staging changes.
+Install workflow tools with `./scripts/install-dev-tools.sh` (Node 20+, npm and Go 1.25+), then enable hooks with `./scripts/install-hooks.sh`. The installer preserves existing hook configurations. The tracked `.githooks/pre-commit` dispatches app and workflow checks independently:
 
-Hook behavior can be verified without Android dependencies:
+- `.githooks/pre-commit-android`: `spotlessApply`, `spotlessCheck` and `:app:lintDebug` for staged Android/build changes.
+- `.githooks/pre-commit-workflows`: pinned Prettier YAML formatting and actionlint for staged workflow/tooling changes. It checks all tracked workflows, includes staged additions, and handles deletions. Untracked drafts remain untouched. actionlint's optional ShellCheck/Pyflakes integrations are disabled to keep the checks consistent across machines.
+
+Both scopes are checked for unstaged edits before either formatter runs. Partial staging blocks only relevant checks; docs/backend-only commits skip both. Formatter changes remain unstaged for review and block the commit until staged. Lint errors and missing tools also block commits with actionable output. The hooks never install workflow tools or stage files automatically; Gradle may resolve its usual dependencies.
+
+The workflow CI job installs the same pinned tools, then runs `npm run check:workflows`. Local checks:
 
 ```sh
 python3 -m unittest discover -s scripts/tests -v
-sh -n .githooks/pre-commit scripts/install-hooks.sh
+sh -n .githooks/pre-commit .githooks/pre-commit-android .githooks/pre-commit-workflows scripts/*.sh
+npm run format:workflows
+npm run check:workflows
+./gradlew spotlessCheck :app:lintDebug
 ```
 
-Local validation for this automation: all **9 hook tests passed**, shell syntax passed, and both workflow jobs parsed successfully as YAML. Actual Spotless/lint/test/APK execution could not start because the sandbox blocks the Gradle distribution lock; dependency downloads also fail DNS resolution. Installing the hook in this checkout was attempted but `.git/config` is not writable in the sandbox. Run `./scripts/install-hooks.sh` in your normal terminal. The existing sources have **not** yet been reformatted by ktfmt; run `./gradlew spotlessApply` before the first CI pass (or review the patch that the first workflow run produces). No GitHub-hosted run has been triggered or observed here.
+Local validation: all **19 hook tests pass**, shell syntax checks pass, the real Prettier/actionlint workflow check passes, and `./gradlew spotlessCheck :app:lintDebug` passes. The combined hook is enabled in this checkout through `core.hooksPath=.githooks`.
+
+Hook tests use disposable Git repositories and stub tools to cover app/workflow routing, formatter and linter failures, missing tools, partial staging, preservation of the index, untracked workflows, deleted workflows and installer conflicts. These test hook orchestration; run the real workflow and Gradle checks above to validate their toolchains. GitHub-hosted execution is separate from local validation.
 
 ## Shopping, gifts, dictation and completion-alert acceptance
 
