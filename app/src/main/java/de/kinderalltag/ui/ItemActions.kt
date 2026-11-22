@@ -96,6 +96,11 @@ internal fun taskActionOccurrences(
     val live = state.taskOccurrences(date).filter { it.revision.taskId == task.taskId }
     if (task.active) return live
     if (task.frequency == Frequency.WEEKDAYS && date.dayOfWeek !in task.weekdays) return live
+    if (
+        task.frequency in setOf(Frequency.DAILY, Frequency.WEEKS, Frequency.MONTHS) &&
+            !task.copy(active = true).isDue(date)
+    )
+        return live
     val source = state.revisions.firstOrNull { it.taskId == task.taskId } ?: return emptyList()
     val resumed =
         task.times.mapIndexed { index, time ->
@@ -135,10 +140,12 @@ internal fun ItemActionDialog(
                     val first = maxOf(today, definition.start)
                     val upcoming =
                         if (definition.active) state.futureTaskOccurrences(definition.taskId, now)
-                        else
-                            (0L..7L).flatMap {
-                                taskActionOccurrences(state, definition, first.plusDays(it))
-                            }
+                        else {
+                            val schedule = definition.copy(active = true)
+                            val date = schedule.nextDueDate(first)
+                            listOfNotNull(date, date?.let { schedule.nextDueDate(it.plusDays(1)) })
+                                .flatMap { taskActionOccurrences(state, definition, it) }
+                        }
                     upcoming.firstOrNull {
                         it.instant > now &&
                             (target.deleting ||

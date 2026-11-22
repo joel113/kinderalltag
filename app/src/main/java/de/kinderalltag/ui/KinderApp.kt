@@ -21,6 +21,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -38,6 +39,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -204,6 +206,26 @@ fun KinderApp(
     }
     var showCalendars by remember {
         mutableStateOf(displayPreferences.getBoolean("show_calendars", true))
+    }
+    var showUpcomingTasks by remember {
+        mutableStateOf(displayPreferences.getBoolean("show_upcoming_tasks", false))
+    }
+    var upcomingTaskCount by remember {
+        mutableStateOf(displayPreferences.getInt("upcoming_task_count", 5).coerceIn(1, 50))
+    }
+    var upcomingTaskDays by remember {
+        mutableStateOf(displayPreferences.getInt("upcoming_task_days", 7).coerceIn(1, 365))
+    }
+    var pastTaskDays by remember {
+        mutableStateOf(displayPreferences.getInt("past_task_days", 7).takeIf { it in 1..365 } ?: 7)
+    }
+    var showPastTasks by remember {
+        mutableStateOf(
+            displayPreferences.getBoolean(
+                "show_past_tasks",
+                displayPreferences.getInt("past_task_days", 7) > 0,
+            )
+        )
     }
     val inbox = remember { (context.applicationContext as KinderApplication).calendarInbox }
     val incoming by inbox.state.collectAsStateWithLifecycle()
@@ -683,6 +705,9 @@ fun KinderApp(
                             vm = vm,
                             busy = busy,
                             now = now,
+                            upcomingTaskLimit = if (showUpcomingTasks) upcomingTaskCount else 0,
+                            upcomingTaskDays = upcomingTaskDays,
+                            pastTaskDays = if (showPastTasks) pastTaskDays else 0,
                             onSelectDate = { chosen ->
                                 homeDayOffset = chosen.toEpochDay() - today.toEpochDay()
                             },
@@ -713,6 +738,7 @@ fun KinderApp(
                             showIntroduction = showIntroductions,
                             showCalendar = showCalendars,
                             calendar = taskCalendar,
+                            onOpen = { selected = it },
                             onCalendarChange = {
                                 taskCalendar = it
                                 taskPage = 0
@@ -793,6 +819,43 @@ fun KinderApp(
                                     .apply()
                             },
                             showCalendars = showCalendars,
+                            showUpcomingTasks = showUpcomingTasks,
+                            onShowUpcomingTasksChange = {
+                                showUpcomingTasks = it
+                                displayPreferences
+                                    .edit()
+                                    .putBoolean("show_upcoming_tasks", it)
+                                    .apply()
+                            },
+                            upcomingTaskCount = upcomingTaskCount,
+                            onUpcomingTaskCountChange = {
+                                upcomingTaskCount = it.coerceIn(1, 50)
+                                displayPreferences
+                                    .edit()
+                                    .putInt("upcoming_task_count", upcomingTaskCount)
+                                    .apply()
+                            },
+                            upcomingTaskDays = upcomingTaskDays,
+                            onUpcomingTaskDaysChange = {
+                                upcomingTaskDays = it.coerceIn(1, 365)
+                                displayPreferences
+                                    .edit()
+                                    .putInt("upcoming_task_days", upcomingTaskDays)
+                                    .apply()
+                            },
+                            showPastTasks = showPastTasks,
+                            onShowPastTasksChange = {
+                                showPastTasks = it
+                                displayPreferences.edit().putBoolean("show_past_tasks", it).apply()
+                            },
+                            pastTaskDays = pastTaskDays,
+                            onPastTaskDaysChange = {
+                                pastTaskDays = it.coerceIn(1, 365)
+                                displayPreferences
+                                    .edit()
+                                    .putInt("past_task_days", pastTaskDays)
+                                    .apply()
+                            },
                             onShowCalendarsChange = {
                                 showCalendars = it
                                 displayPreferences.edit().putBoolean("show_calendars", it).apply()
@@ -901,6 +964,9 @@ private fun Checklist(
     vm: FamilyViewModel? = null,
     busy: Boolean = false,
     now: Instant = Instant.now(),
+    upcomingTaskLimit: Int = 0,
+    upcomingTaskDays: Int = 7,
+    pastTaskDays: Int = 0,
     onSelectDate: ((LocalDate) -> Unit)? = null,
     onOpenAppointment: (AppointmentOccurrence) -> Unit = {},
     onOpen: (Occurrence) -> Unit,
@@ -915,6 +981,64 @@ private fun Checklist(
     val appointments =
         if (showAppointments) visibleAppointments(state, date, date, childId, onlyMine)
         else emptyList()
+    val upcomingTasks =
+        remember(
+            state.revisions,
+            state.events,
+            state.itemOperations,
+            date,
+            upcomingTaskLimit,
+            upcomingTaskDays,
+            childId,
+            onlyMine,
+            state.uid,
+            showTasks,
+        ) {
+            if (showTasks && upcomingTaskLimit > 0)
+                upcomingTaskOccurrences(
+                    state.revisions,
+                    state.events,
+                    state.itemOperations,
+                    date,
+                    upcomingTaskLimit,
+                    childId,
+                    state.uid,
+                    onlyMine,
+                    days = upcomingTaskDays,
+                )
+            else emptyList()
+        }
+    val overdueTasks =
+        remember(
+            state.revisions,
+            state.events,
+            state.itemOperations,
+            date,
+            now.epochSecond / 60,
+            pastTaskDays,
+            childId,
+            onlyMine,
+            state.uid,
+            showTasks,
+        ) {
+            if (showTasks && pastTaskDays > 0)
+                overdueTaskOccurrences(
+                    state.revisions,
+                    state.events,
+                    state.itemOperations,
+                    date,
+                    now,
+                    pastTaskDays,
+                    childId,
+                    state.uid,
+                    onlyMine,
+                )
+            else emptyList()
+        }
+    val displayedTasks =
+        (overdueTasks + due + upcomingTasks).sortedWith(
+            compareBy<Occurrence> { it.instant }.thenBy { it.revision.title }.thenBy { it.id }
+        )
     val done = due.count { Schedule.activeCompletions(state.events, it.id).isNotEmpty() }
     val appointmentsFinished = appointments.count { it.details.endInstant <= now }
     LazyColumn(
@@ -1043,12 +1167,19 @@ private fun Checklist(
                     fontWeight = FontWeight.Bold,
                 )
             }
-            if (due.isEmpty()) item { EmptyCard("Für diesen Tag stehen keine Aufgaben an.") }
+            if (displayedTasks.isEmpty())
+                item {
+                    EmptyCard(
+                        if (upcomingTaskLimit > 0 || pastTaskDays > 0)
+                            "Für diesen Tag und den gewählten Zeitraum stehen keine Aufgaben an."
+                        else "Für diesen Tag stehen keine Aufgaben an."
+                    )
+                }
         }
         state.sections
             .filter { childId == null || childId == it.id }
             .forEach { child ->
-                val tasks = due.filter { it.revision.childId == child.id }
+                val tasks = displayedTasks.filter { it.revision.childId == child.id }
                 if (tasks.isNotEmpty()) {
                     item {
                         Row(
@@ -1112,7 +1243,9 @@ private fun Checklist(
                                         fontWeight = FontWeight.Bold,
                                     )
                                     Text(
-                                        formats.time(occurrence.time),
+                                        if (occurrence.date == date) formats.time(occurrence.time)
+                                        else
+                                            "${formats.fullDate(occurrence.date)} · ${formats.time(occurrence.time)}",
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                     Text(
@@ -1121,7 +1254,10 @@ private fun Checklist(
                                     )
                                     Text(
                                         if (completed.isEmpty()) {
-                                            if (date < today) "Nicht bestätigt" else "Noch offen"
+                                            if (occurrence.date > date) "Geplant"
+                                            else if (occurrence.date < date) "Überfällig"
+                                            else if (date < today) "Nicht bestätigt"
+                                            else "Noch offen"
                                         } else
                                             completed.joinToString(" · ") {
                                                 completionText(it, formats)
@@ -1232,6 +1368,7 @@ private fun TaskList(
     showCalendar: Boolean,
     calendar: CalendarOverviewState,
     onCalendarChange: (CalendarOverviewState) -> Unit,
+    onOpen: (Occurrence) -> Unit,
     onEdit: (TaskRevision) -> Unit,
     onDelete: (TaskRevision, LocalDate?) -> Unit,
     onArchive: (TaskRevision) -> Unit,
@@ -1401,7 +1538,7 @@ private fun TaskList(
                     Text(
                         times.sorted().joinToString(" · ", transform = formats::time) +
                             " · " +
-                            frequencyLabel(task.frequency)
+                            frequencyLabel(task.frequency, task.interval)
                     )
                     Text(
                         "Zuständig: ${responsibilityName(task.responsibleParentId, state.parents)}",
@@ -1441,6 +1578,10 @@ private fun TaskList(
             busy,
             now,
             onDismiss = { details = null },
+            onOpen = {
+                details = null
+                onOpen(it)
+            },
             onEdit = {
                 details = null
                 onEdit(selection.editable)
@@ -1477,11 +1618,13 @@ private fun TaskList(
     }
 }
 
-private fun frequencyLabel(frequency: Frequency) =
+internal fun frequencyLabel(frequency: Frequency, interval: Int = 1) =
     when (frequency) {
         Frequency.ONCE -> "Einmalig"
-        Frequency.DAILY -> "Täglich"
+        Frequency.DAILY -> if (interval == 1) "Täglich" else "Alle $interval Tage"
         Frequency.WEEKDAYS -> "An Wochentagen"
+        Frequency.WEEKS -> if (interval == 1) "Wöchentlich" else "Alle $interval Wochen"
+        Frequency.MONTHS -> if (interval == 1) "Monatlich" else "Alle $interval Monate"
     }
 
 @Composable
@@ -1599,6 +1742,11 @@ private fun OccurrenceDialog(
                 "Gespeicherter Stand: Bestätigungen vom anderen Telefon sind möglicherweise noch nicht sichtbar."
             )
         if (completed.isEmpty()) {
+            if (occurrence.instant > now)
+                Text(
+                    "Eine Bestätigung im Voraus zählt für diese Ausführung. Im Verlauf steht der jetzige Zeitpunkt.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             if (occurrence.date < today)
                 Text(
                     "Eine nachträgliche Bestätigung zeichnet den jetzigen Zeitpunkt auf.",
@@ -1666,8 +1814,21 @@ private fun Settings(
     onShowIntroductionsChange: (Boolean) -> Unit,
     showCalendars: Boolean,
     onShowCalendarsChange: (Boolean) -> Unit,
+    showUpcomingTasks: Boolean,
+    onShowUpcomingTasksChange: (Boolean) -> Unit,
+    upcomingTaskCount: Int,
+    onUpcomingTaskCountChange: (Int) -> Unit,
+    upcomingTaskDays: Int,
+    onUpcomingTaskDaysChange: (Int) -> Unit,
+    pastTaskDays: Int,
+    onPastTaskDaysChange: (Int) -> Unit,
+    showPastTasks: Boolean,
+    onShowPastTasksChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    var upcomingDaysText by
+        remember(upcomingTaskDays) { mutableStateOf(upcomingTaskDays.toString()) }
+    var pastDaysText by remember(pastTaskDays) { mutableStateOf(pastTaskDays.toString()) }
     var enabled by remember { mutableStateOf(ReminderScheduler.enabled(context)) }
     var newTasks by remember {
         mutableStateOf(ActivityNotifications.enabled(context, state.uid, FamilyNoticeKind.NEW_TASK))
@@ -1789,6 +1950,100 @@ private fun Settings(
                     showCalendars,
                     onShowCalendarsChange,
                 )
+            }
+        }
+        item {
+            SettingsSection("Startseite", Icons.Default.Home, GardenColors.Green) {
+                SettingsToggle(
+                    "Vergangene Aufgaben anzeigen",
+                    "Zeigt noch offene Aufgaben aus vergangenen Tagen auf der Startseite.",
+                    showPastTasks,
+                    onShowPastTasksChange,
+                )
+                if (showPastTasks) {
+                    OutlinedTextField(
+                        value = pastDaysText,
+                        onValueChange = { value ->
+                            if (value.length <= 3 && value.all { it in '0'..'9' }) {
+                                pastDaysText = value
+                                value
+                                    .toIntOrNull()
+                                    ?.takeIf { it in 1..365 }
+                                    ?.let(onPastTaskDaysChange)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Vergangene Aufgaben in Tagen") },
+                        supportingText = { Text("1 bis 365 Tage · Standard: 7") },
+                        isError = pastDaysText.toIntOrNull()?.let { it !in 1..365 } ?: true,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                    Text(
+                        "Offene einmalige Aufgaben bleiben im gewählten Zeitraum sichtbar. Bei wiederkehrenden Aufgaben ersetzt die nächste fällige Ausführung die vorherige.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                HorizontalDivider()
+                SettingsToggle(
+                    "Kommende Aufgaben anzeigen",
+                    "Zeigt künftige Ausführungen direkt bei den Aufgaben des gewählten Tages.",
+                    showUpcomingTasks,
+                    onShowUpcomingTasksChange,
+                )
+                if (showUpcomingTasks) {
+                    HorizontalDivider()
+                    OutlinedTextField(
+                        value = upcomingDaysText,
+                        onValueChange = { value ->
+                            if (value.length <= 3 && value.all { it in '0'..'9' }) {
+                                upcomingDaysText = value
+                                value
+                                    .toIntOrNull()
+                                    ?.takeIf { it in 1..365 }
+                                    ?.let(onUpcomingTaskDaysChange)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Vorschau in Tagen") },
+                        supportingText = {
+                            Text("1 bis 365 Tage nach dem angezeigten Tag · Standard: 7")
+                        },
+                        isError = upcomingDaysText.toIntOrNull()?.let { it !in 1..365 } ?: true,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                    Text(
+                        "Je Aufgabe wird nur die nächste offene Ausführung angezeigt.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    HorizontalDivider()
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Anzahl der Aufgaben", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "1 bis 50 · auf diesem Gerät",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        IconButton(
+                            onClick = { onUpcomingTaskCountChange(upcomingTaskCount - 1) },
+                            enabled = upcomingTaskCount > 1,
+                        ) {
+                            Icon(Icons.Default.Remove, "Weniger kommende Aufgaben")
+                        }
+                        Text(
+                            upcomingTaskCount.toString(),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        IconButton(
+                            onClick = { onUpcomingTaskCountChange(upcomingTaskCount + 1) },
+                            enabled = upcomingTaskCount < 50,
+                        ) {
+                            Icon(Icons.Default.Add, "Mehr kommende Aufgaben")
+                        }
+                    }
+                }
             }
         }
         item { ListLabelSettings(state, vm, busy) }
@@ -2065,6 +2320,7 @@ private fun TaskEditor(
         mutableStateOf(if (single) Frequency.ONCE else existing?.frequency ?: Frequency.DAILY)
     }
     var weekdays by rememberSaveable { mutableStateOf(existing?.weekdays ?: emptySet()) }
+    var intervalText by rememberSaveable { mutableStateOf((existing?.interval ?: 1).toString()) }
     var times by rememberSaveable {
         mutableStateOf(
             if (single) listOf(requireNotNull(selection).occurrence.time)
@@ -2168,8 +2424,52 @@ private fun TaskEditor(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 RadioButton(frequency == value, { frequency = value })
-                                Text(frequencyLabel(value))
+                                Text(
+                                    when (value) {
+                                        Frequency.DAILY -> "Tage"
+                                        Frequency.WEEKS -> "Wochen"
+                                        Frequency.MONTHS -> "Monate"
+                                        else -> frequencyLabel(value)
+                                    }
+                                )
                             }
+                        }
+                    if (
+                        !single &&
+                            frequency in setOf(Frequency.DAILY, Frequency.WEEKS, Frequency.MONTHS)
+                    )
+                        item {
+                            OutlinedTextField(
+                                intervalText,
+                                { value ->
+                                    if (value.length <= 4 && value.all { it in '0'..'9' })
+                                        intervalText = value
+                                },
+                                label = { Text("Alle") },
+                                supportingText = {
+                                    Text(
+                                        when (frequency) {
+                                            Frequency.WEEKS -> "Wochen · 1 bis 1000"
+                                            Frequency.MONTHS -> "Monate · 1 bis 1000"
+                                            else -> "Tage · 1 bis 1000"
+                                        }
+                                    )
+                                },
+                                keyboardOptions =
+                                    KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                enabled = !busy,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text(
+                                "Das Startdatum bestimmt den Rhythmus.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            if (frequency == Frequency.MONTHS)
+                                Text(
+                                    "Gibt es den Tag in einem Monat nicht, gilt der letzte Tag des Monats.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                         }
                     if (frequency == Frequency.WEEKDAYS)
                         item {
@@ -2261,6 +2561,20 @@ private fun TaskEditor(
                                             if (frequency == Frequency.ONCE) null else end,
                                             effective,
                                             responsibleParentId = responsibleParent,
+                                            interval =
+                                                if (
+                                                    frequency in
+                                                        setOf(
+                                                            Frequency.DAILY,
+                                                            Frequency.WEEKS,
+                                                            Frequency.MONTHS,
+                                                        )
+                                                )
+                                                    intervalText.toIntOrNull()
+                                                        ?: throw IllegalArgumentException(
+                                                            "Bitte ein Intervall von 1 bis 1000 angeben."
+                                                        )
+                                                else 1,
                                         )
                                     revision.validate()
                                     require(

@@ -24,6 +24,27 @@ data class FamilyReminder(
 fun AppointmentOccurrence.reminderFingerprint(): String = details.toString()
 
 object FamilyReminders {
+    fun taskNeedsReminder(
+        id: String,
+        date: java.time.LocalDate,
+        scheduledAt: Instant,
+        uid: String?,
+        revisions: List<TaskRevision>,
+        events: List<CareEvent>,
+        operations: List<ItemOperation>,
+        now: Instant,
+    ): Boolean {
+        if (Schedule.activeCompletions(events, id).isNotEmpty()) return false
+        val occurrence =
+            ManagedTasks.occurrences(revisions, events, operations, date).firstOrNull {
+                it.id == id
+            } ?: return false
+        return isResponsible(occurrence.revision.responsibleParentId, uid) &&
+            occurrence.instant == scheduledAt &&
+            occurrence.instant <= now &&
+            now < date.plusDays(1).atStartOfDay(FAMILY_ZONE).toInstant()
+    }
+
     fun plan(
         uid: String?,
         sections: List<Child>,

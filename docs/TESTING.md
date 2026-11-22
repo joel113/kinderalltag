@@ -16,7 +16,47 @@ npm install
 npx firebase emulators:exec --config ../firebase.json --project demo-kinderalltag --only firestore 'npm test'
 ```
 
+## Completed-task reminder cancellation
+
+Task reminders are removed from saved alarm records and AlarmManager as soon as an active completion is observed, including pending offline writes and partial/error states in unrelated collections. Already-visible reminder notifications are removed as well; the separate other-parent activity notices retain their own behavior. A queued alarm is revalidated against the current occurrence, completion/correction history, schedule time, responsibility and expiry before delivery. A queued alarm for an old schedule cannot consume a newer future replacement with the same ID.
+
+Cold-started task alarms use `goAsync`, wait up to six seconds for synchronized state, then validate the latest fully loaded state. Loaded cached data supports offline reminders; incomplete or unauthorized state suppresses delivery. Another phone's unsynchronized completion cannot be inferred while offline, so cross-phone cancellation requires that completion to reach this phone. The broadcast result is finished on every exit path. This does not add push infrastructure or new Firebase rules.
+
+Phone acceptance: schedule a reminder, complete the execution before its time, and verify no reminder appears, including after process restart/reboot and offline completion. Repeat while an unrelated collection has a sync error. Complete on the other phone and synchronize; verify both pending and already-visible reminders disappear. Exercise corrections, concurrent confirmations, reassignment, deletion/restoration, moves with stable IDs, and a cold-started receiver. Only the completed execution is suppressed; other dates/times still remind normally. Unit tests cover planning and delivery eligibility; AlarmManager/broadcast timing and notification-tray behavior require device checks.
+
+Validation: 210 Android JVM tests pass, along with Spotless, Android Lint and debug assembly.
+
+## Task repeat intervals
+
+Local validation: **221 Android JVM tests** and **39 demo Firestore rules tests** pass, along with Spotless, Android Lint and debug assembly. Tests cover N-day/N-week rhythm, DST, month-end/leap-day clamping without drift, start/effective/end bounds, sparse next-execution lookup, preview/reminder/overdue/tracker agreement, snapshot round trips and legacy defaults, and immutable started/early-completed executions during interval edits. Rules tests cover valid/invalid interval values and full eight-slot interval confirmations, corrections and future edits within the expression budget.
+
+Publish the updated rules and install this build on both phones. Create tasks every 2/3 days, 2/3 weeks, and 2/3 months. Check their start weekday/day anchor, shorter months, end dates, multiple times, responsibility, calendar and home previews, advance completion and correction, reminder cancellation, overdue replacement and tracker cells. Edit only one execution, then this and following executions; confirm that historical snapshots retain their old interval. Pause and resume a task whose next execution lies more than a week away. Existing tasks without an interval must still repeat as before. UI/picker rendering, alarm delivery and two-phone synchronization require device checks.
+
 ## Two-phone acceptance
+
+### Retaining unfinished past tasks
+
+Toggle **Einstellungen → Startseite → Vergangene Aufgaben anzeigen** to show or hide retained tasks. While enabled, set **Vergangene Aufgaben in Tagen** to 1–365 (default 7). Turning the switch off preserves the period; both values persist per phone independently of the future-preview switch. A previously saved zero-day period becomes an off switch with a 7-day period ready for re-enabling. Invalid input retains the last valid saved value.
+
+Unfinished one-off executions inside the lookback remain in the regular Aufgaben list, labelled **Überfällig** with their original date/time. For recurring tasks, only the latest due execution from a previous day may remain; when a newer execution becomes due, the older one disappears even if the newer one was completed. A future preview alone does not replace an overdue execution. Today uses the current Berlin time; browsing another date evaluates that day's full schedule. The daily progress totals still count only the displayed day's executions.
+
+Check inclusive lookback boundaries, disabled retention, completion/correction, weekly gaps, multiple daily times, the exact next due time, child/parent filters, deletion/restoration, Berlin DST and navigation between dates. No schema migration or rules deployment is required.
+
+### Upcoming task preview on the home screen
+
+Under **Einstellungen → Startseite**, enable **Kommende Aufgaben anzeigen**, choose 1–50 tasks (default 5), and enter **Vorschau in Tagen** (1–365, default 7). Both limits are saved on this device. Invalid or empty day input is marked and retains the last valid saved value. The option defaults to off and retains both limits when toggled off. Reopen the app to verify persistence.
+
+Future tasks appear directly in the regular **Aufgaben** list under the matching child/household, after that day's tasks in chronological order. Their cards show a full date/time and **Geplant**; the separate **Nächste Aufgaben** section is removed. Termine follows the combined task list, and Einkäufe remains last. Future items do not affect the displayed day's progress totals.
+
+Verify one next open execution per task after the displayed date, up to and including the final preview day. Test one-offs at midnight on the first day, 23:59 on the final day, and just beyond the configured range; recurring tasks with multiple daily times; advance completions; Berlin midnight/DST; moved/deleted/restored tasks; and expired/paused schedules. Child/parent filters apply before the count limit. Change the home date and verify the window moves with it. Tap a future task to confirm/correct it for either parent; its replacement must remain within the window. No Firestore schema or rules update is needed.
+
+### Confirm executions from Aufgaben
+
+Open a task under **Aufgaben → Ausführungen**, choose a date, and tap its time to open the existing completion dialog. Check one-off and recurring tasks, several times per day, and dates in the future. Select either parent under **Erledigt von** and confirm. Only the chosen execution should become completed; history records the actual acknowledgement time. Correct the confirmation and verify that an unconfirmed future execution becomes upcoming again.
+
+Check dates without an execution, paused/deleted/moved instances, offline confirmations, calendar-filtered task lists, and synchronization to the other phone. Changed or deleted task definitions must not open stale executable actions. This UI change needs no new Firestore rules or migration.
+
+Validation for this change: 186 Android JVM tests and 37 demo Firestore rules tests pass, along with Spotless, Android Lint and debug assembly. Phone rendering and the two-phone flow remain manual checks.
 
 ### Rejected-write regression checks
 

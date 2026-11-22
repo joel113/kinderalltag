@@ -8,7 +8,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -197,6 +198,7 @@ internal fun TaskDefinitionDialog(
     busy: Boolean,
     now: Instant,
     onDismiss: () -> Unit,
+    onOpen: (Occurrence) -> Unit,
     onEdit: () -> Unit,
     onPause: () -> Unit,
     onDelete: () -> Unit,
@@ -215,6 +217,17 @@ internal fun TaskDefinitionDialog(
         if (!selection.historical && task.active)
             state.futureTaskOccurrences(task.taskId, now).firstOrNull()
         else null
+    var executionDate by
+        rememberSaveable(task.taskId, selection.date) {
+            mutableStateOf(
+                (selection.date ?: upcoming?.date ?: now.atZone(FAMILY_ZONE).toLocalDate())
+                    .toString()
+            )
+        }
+    val executions =
+        state.taskOccurrences(LocalDate.parse(executionDate)).filter {
+            it.revision.taskId == task.taskId
+        }
     ItemDetailsDialog(
         task.title,
         "Aufgabe",
@@ -256,14 +269,13 @@ internal fun TaskDefinitionDialog(
             )
             val recurrence =
                 when (task.frequency) {
-                    Frequency.ONCE -> "Einmalig"
-                    Frequency.DAILY -> "Täglich"
                     Frequency.WEEKDAYS ->
                         task.weekdays
                             .sortedBy { it.value }
                             .joinToString(" · ") {
                                 it.getDisplayName(TextStyle.SHORT, formats.locale)
                             }
+                    else -> frequencyLabel(task.frequency, task.interval)
                 }
             DetailValue(Icons.Default.Repeat, "Wiederholung", recurrence)
             DetailValue(
@@ -285,6 +297,39 @@ internal fun TaskDefinitionDialog(
                     "Nächste Ausführung",
                     "${formats.fullDate(upcoming.date)} · ${formats.time(upcoming.time)}",
                 )
+        }
+        DetailSection("Ausführungen", GardenColors.Cream) {
+            Text(
+                "Wähle Tag und Uhrzeit, um eine Ausführung zu bestätigen – auch im Voraus.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            DatePickerField(
+                "Tag",
+                LocalDate.parse(executionDate),
+                onSelect = { date -> date?.let { executionDate = it.toString() } },
+                enabled = !busy,
+            )
+            if (executions.isEmpty())
+                Text(
+                    "Für diesen Tag ist keine Ausführung geplant.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            executions.forEach { occurrence ->
+                val completed = Schedule.activeCompletions(state.events, occurrence.id).isNotEmpty()
+                OutlinedButton(
+                    onClick = { onOpen(occurrence) },
+                    enabled = current && !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(if (completed) Icons.Default.CheckCircle else Icons.Default.Schedule, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "${formats.time(occurrence.time)} · ${if (completed) "Erledigt · Details" else "Ausführung bestätigen"}",
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(Icons.Default.ChevronRight, null)
+                }
+            }
         }
         TaskCompletionOverview(task.taskId, state, now, selection.date)
         if (task.notes.isNotBlank())

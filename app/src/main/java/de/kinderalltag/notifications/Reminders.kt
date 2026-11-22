@@ -6,12 +6,15 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import de.kinderalltag.KinderApplication
 import de.kinderalltag.MainActivity
 import de.kinderalltag.R
 import de.kinderalltag.data.*
 import de.kinderalltag.domain.*
 import java.time.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -81,6 +84,30 @@ object ReminderScheduler {
         prefs(context).edit().remove("records").remove("deliveredAppointments").apply()
     }
 
+    // Completion cancellation must not depend on unrelated collections finishing their sync.
+    fun cancelCompleted(context: Context, events: List<CareEvent>) {
+        val completed =
+            events
+                .groupBy { it.occurrenceId }
+                .filter { (id, history) -> Schedule.activeCompletions(history, id).isNotEmpty() }
+                .keys
+        if (completed.isEmpty()) return
+        val alarm = context.getSystemService(AlarmManager::class.java)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val saved = JSONArray(prefs(context).getString("records", "[]"))
+        val retained = JSONArray()
+        for (index in 0 until saved.length()) {
+            val item = saved.getJSONObject(index)
+            val id = item.getString("id")
+            if (id in completed) alarm.cancel(intent(context, id)) else retained.put(item)
+        }
+        manager.activeNotifications
+            .filter { it.notification.channelId == CHANNEL && it.tag in completed }
+            .forEach { manager.cancel(it.tag, it.id) }
+        if (retained.length() != saved.length())
+            prefs(context).edit().putString("records", retained.toString()).apply()
+    }
+
     fun update(context: Context, state: FamilyState) {
         if (!enabled(context) || !state.loaded) return
         val now = Instant.now()
@@ -105,13 +132,7 @@ object ReminderScheduler {
             val id = old.getJSONObject(i).getString("id")
             if (id !in ids) alarm.cancel(intent(context, id))
         }
-        // Cancel a delivered notification once its completion reaches this phone.
-        state.events
-            .groupBy { it.occurrenceId }
-            .forEach { (id, events) ->
-                if (Schedule.activeCompletions(events, id).isNotEmpty())
-                    context.getSystemService(NotificationManager::class.java).cancel(id, 0)
-            }
+        cancelCompleted(context, state.events)
         context
             .getSystemService(NotificationManager::class.java)
             .activeNotifications
@@ -227,10 +248,64 @@ class ReminderReceiver : BroadcastReceiver() {
         if (!ReminderScheduler.enabled(context)) return
         val id = intent.data?.lastPathSegment ?: return
         val item = ReminderScheduler.record(context, id)
+        // A queued alarm for an older schedule must not consume its newer replacement.
+        if (item != null && item.getLong("at") > System.currentTimeMillis()) {
+            ReminderScheduler.restore(context)
+            return
+        }
         ReminderScheduler.consume(context, id)
         ReminderScheduler.restore(context)
         if (id == "calendar_refresh") ReminderScheduler.refresh(context)
         if (item == null) return
+        if (item.optString("kind", "task") == "task") {
+            val pending = goAsync()
+            CoroutineScope(Dispatchers.Main.immediate).launch {
+                try {
+                    val repository =
+                        (context.applicationContext as? KinderApplication)?.repository
+                            ?: return@launch
+                    val uid = repository.state.value.uid ?: return@launch
+                    // Prefer synchronized data after a cold start. A fully loaded cache still
+                    // supports offline reminders; incomplete state cannot authorize delivery.
+                    withTimeoutOrNull(6_000) {
+                        repository.state.first { state ->
+                            state.uid != uid ||
+                                (state.accessResolved && !state.authorized) ||
+                                Schedule.activeCompletions(state.events, id).isNotEmpty() ||
+                                (state.loaded && state.authorized && !state.fromCache)
+                        }
+                    }
+                    val state = repository.state.value
+                    if (state.uid != uid || !state.authorized || !state.loaded) return@launch
+                    if (
+                        !FamilyReminders.taskNeedsReminder(
+                            id,
+                            LocalDate.parse(item.getString("date")),
+                            Instant.ofEpochMilli(item.getLong("at")),
+                            uid,
+                            state.revisions,
+                            state.events,
+                            state.itemOperations,
+                            Instant.now(),
+                        )
+                    )
+                        return@launch
+                    showNotification(context, id, item)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w("KinderalltagReminder", "Task reminder validation failed", e)
+                } finally {
+                    pending.finish()
+                }
+            }
+            return
+        }
+        showNotification(context, id, item)
+    }
+
+    private fun showNotification(context: Context, id: String, item: JSONObject) {
+        if (!ReminderScheduler.enabled(context)) return
         if (ReminderScheduler.expiresAt(item) <= System.currentTimeMillis()) return
         if (
             Build.VERSION.SDK_INT >= 33 &&

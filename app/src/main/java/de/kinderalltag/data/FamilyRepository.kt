@@ -534,6 +534,7 @@ private fun TaskRevision.encode(uid: String): Map<String, Any?> =
         "title" to title.trim(),
         "notes" to notes.trim(),
         "frequency" to frequency.name,
+        "interval" to interval,
         "weekdays" to weekdays.map { it.value },
         "times" to times.sorted().map { it.toString() },
         "start" to start.toString(),
@@ -553,6 +554,7 @@ private fun decodeRevision(doc: DocumentSnapshot) =
         title = requireNotNull(doc.getString("title")),
         notes = doc.getString("notes") ?: "",
         frequency = Frequency.valueOf(requireNotNull(doc.getString("frequency"))),
+        interval = doc.getLong("interval")?.toInt() ?: 1,
         weekdays =
             (doc.get("weekdays") as? List<*>)?.map { DayOfWeek.of((it as Number).toInt()) }?.toSet()
                 ?: emptySet(),

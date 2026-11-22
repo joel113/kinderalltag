@@ -28,6 +28,7 @@ class KinderApplication : Application() {
             scope.launch {
                 repository!!.state.collect { state ->
                     ActivityNotifications.update(this@KinderApplication, state)
+                    ReminderScheduler.cancelCompleted(this@KinderApplication, state.events)
                     if (state.authorized && state.loaded && state.error == null)
                         ReminderScheduler.update(this@KinderApplication, state)
                     else if (state.uid == null || (!state.authorized && state.accessResolved))

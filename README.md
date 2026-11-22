@@ -15,11 +15,13 @@ Open this directory in Android Studio, select JDK 17 or 21 for Gradle, and insta
 Without `app/google-services.json`, the app builds into a setup screen. With configuration it supports:
 
 - Shared today view, grouped by child, with completion details and the current shopping list.
+- Optionally retain unfinished past tasks on the home screen for 1–365 days (default 7); a Settings switch hides them without resetting the period. Recurring tasks retain only the latest due execution.
+- Optional future tasks integrated into the home task list: choose 1–50 tasks within the next 1–365 days under Einstellungen → Startseite (default preview range: 7 days).
 - Undated shopping and gift lists, configurable labels and offline purchase checkboxes.
 - Gift ideas for either child or both, with occasion and giver labels.
 - German voice dictation for titles/notes and reviewed multi-item shopping imports.
 - Optional live notifications when the other parent completes a task.
-- One-off, daily, selected weekday and multiple-time schedules.
+- One-off, selected-weekday and multiple-time tasks, plus repeats every N days, weeks or months.
 - History by date and child, including late acknowledgements and corrections.
 - Offline acknowledgements with visible pending synchronization.
 - Immediate edits to upcoming occurrences, retaining started and confirmed instances.
@@ -29,7 +31,7 @@ Without `app/google-services.json`, the app builds into a setup screen. With con
 - Native date/time pickers with locale-aware formatting.
 - Saving individual appointments through the phone’s calendar editor.
 - Sharing and reviewed import of standard `.ics` calendar files.
-- Optional reminders configured separately on each phone.
+- Optional reminders configured separately on each phone, canceled when completion is known and rechecked before delivery.
 - Editable child names and Google account sign-in.
 
 For release signing and manual installation, see [SETUP.md](docs/SETUP.md). For storage and concurrency decisions, see [ARCHITECTURE.md](docs/ARCHITECTURE.md). For acceptance checks, see [TESTING.md](docs/TESTING.md).

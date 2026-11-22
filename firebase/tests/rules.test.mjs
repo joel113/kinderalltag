@@ -559,6 +559,29 @@ test('purchase snapshots must reference an actual immutable item version', async
 });
 
 // Exercise the full Android completion shape, including credited-parent fields and snapshots.
+test('either parent can confirm and correct a future execution with delegated credit', async () => {
+  const db = dbFor('parent-a');
+  await seedOperationSource(db);
+  const date = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const occurrenceId = `task-1_source_${date}_28800`;
+  const snapshot = { revision: taskSnapshot(), date, time: '08:00', id: occurrenceId,
+    originalDate: date, originalTime: '08:00', sourceId: 'source' };
+  for (const uid of ['parent-a', 'parent-b']) {
+    const id = `advance-${uid}`;
+    await assertSucceeds(setDoc(doc(dbFor(uid), `${path}/events/${id}`), event(uid, {
+      date, occurrenceId, taskSnapshot: snapshot, completedById: uid === 'parent-a' ? 'parent-b' : 'parent-a',
+      completedByName: 'Elternteil',
+    })));
+    const stored = (await getDoc(doc(db, `${path}/events/${id}`))).data();
+    assert.equal(stored.date, date);
+    assert.ok(stored.clientMillis < Date.parse(`${date}T08:00:00Z`));
+    assert.ok(stored.createdAt.toMillis() < Date.parse(`${date}T08:00:00Z`));
+    await assertSucceeds(setDoc(doc(db, `${path}/events/undo-${id}`), event('parent-a', {
+      kind: 'RETRACT', targetId: id, date, occurrenceId, taskSnapshot: snapshot,
+    })));
+  }
+});
+
 test('both parents can confirm unedited legacy tasks with empty slot origins and delegated credit', async () => {
   const db = dbFor('parent-a');
   await seedOperationSource(db);
@@ -619,4 +642,49 @@ test('completion snapshots enforce time, field, source and credit validation', a
   await assertFails(setDoc(doc(db, `${path}/events/forged-credit`), event('parent-a', {
     date: snapshot.date, occurrenceId, taskSnapshot: snapshot, completedById: 'stranger', completedByName: 'Fremd',
   })));
+});
+
+test('task intervals accept day week and month schedules while preserving legacy validation', async () => {
+  const db = dbFor('parent-a');
+  for (const frequency of ['DAILY', 'WEEKS', 'MONTHS']) {
+    for (const interval of [1, 2, 3, 1000]) {
+      await assertSucceeds(setDoc(doc(db, `${path}/revisions/${frequency}-${interval}`),
+        { ...revision('parent-a'), frequency, interval }));
+    }
+  }
+  for (const [index, changes] of [
+    { interval: 0 }, { interval: -1 }, { interval: 1001 }, { interval: 1.5 }, { interval: '2' }, { interval: null },
+    { frequency: 'ONCE', interval: 2 }, { frequency: 'WEEKDAYS', weekdays: [1], interval: 2 }, { frequency: 'YEARS', interval: 1 },
+  ].entries()) await assertFails(setDoc(doc(db, `${path}/revisions/bad-interval-${index}`), { ...revision('parent-a'), ...changes }));
+});
+
+test('eight-slot interval snapshots support delegated confirmations corrections and following edits', async () => {
+  const db = dbFor('parent-a');
+  await seedOperationSource(db);
+  const times = ['00:00', '06:00', '08:00', '10:00', '12:00', '16:00', '18:00', '23:59'];
+  const seconds = [0, 21600, 28800, 36000, 43200, 57600, 64800, 86340];
+  const date = '2027-01-31';
+  const occurrenceId = `task-1_source_${date}_28800`;
+  const future = Timestamp.fromMillis(Date.now() + 86400000);
+  for (const [index, frequency] of ['DAILY', 'WEEKS', 'MONTHS'].entries()) {
+    const revisionSnapshot = { ...taskSnapshot(), times, slotOrigins: seconds.map(value => `source|${value}`),
+      frequency, interval: 3, responsibleParentId: 'parent-b' };
+    const snapshot = { revision: revisionSnapshot, date, time: '08:00', id: occurrenceId,
+      originalDate: date, originalTime: '08:00', sourceId: 'source' };
+    const id = `interval-${frequency}`;
+    await assertSucceeds(setDoc(doc(db, `${path}/events/${id}`), event('parent-a', {
+      date, occurrenceId, taskSnapshot: snapshot, completedById: 'parent-b', completedByName: 'Mama',
+    })));
+    await assertSucceeds(setDoc(doc(dbFor('parent-b'), `${path}/events/undo-${id}`), event('parent-b', {
+      kind: 'RETRACT', targetId: id, date, occurrenceId, taskSnapshot: snapshot,
+    })));
+    await assertSucceeds(writeOperation(db, `edit-${frequency}`, itemOperation('parent-a', {
+      action: 'EDIT', scope: 'FOLLOWING', task: revisionSnapshot, actualStartAt: future, version: index + 1,
+    })));
+    for (const [badIndex, interval] of [0, 1001, 1.5, '3', null].entries()) {
+      await assertFails(setDoc(doc(db, `${path}/events/bad-interval-${frequency}-${badIndex}`), event('parent-a', {
+        date, occurrenceId, taskSnapshot: { ...snapshot, revision: { ...revisionSnapshot, interval } },
+      })));
+    }
+  }
 });

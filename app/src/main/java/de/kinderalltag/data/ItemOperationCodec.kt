@@ -13,6 +13,7 @@ internal fun TaskRevision.snapshotMap(): Map<String, Any?> =
         "title" to title,
         "notes" to notes,
         "frequency" to frequency.name,
+        "interval" to interval,
         "weekdays" to weekdays.map { it.value },
         "times" to times.map { it.toString() },
         "start" to start.toString(),
@@ -33,6 +34,8 @@ internal fun taskSnapshot(data: Map<*, *>): TaskRevision =
             title = data["title"] as String,
             notes = data["notes"] as String,
             frequency = Frequency.valueOf(data["frequency"] as String),
+            interval =
+                if (data.containsKey("interval")) (data["interval"] as Number).toInt() else 1,
             weekdays =
                 (data["weekdays"] as List<*>).map { DayOfWeek.of((it as Number).toInt()) }.toSet(),
             times = (data["times"] as List<*>).map { LocalTime.parse(it as String) },

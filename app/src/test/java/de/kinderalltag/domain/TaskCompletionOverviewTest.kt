@@ -61,6 +61,25 @@ class TaskCompletionOverviewTest {
     }
 
     @Test
+    fun advanceConfirmationAndCorrectionAffectOnlyTheChosenFutureExecution() {
+        val tomorrow = day.plusDays(1)
+        val occurrence = Occurrence(task, tomorrow, LocalTime.of(8, 0))
+        val event = completion(occurrence)
+        val period = HistoryPeriod(tomorrow, tomorrow.plusDays(1))
+        fun statuses(events: List<CareEvent>) =
+            taskCompletionOverview(task.taskId, listOf(task), events, emptyList(), period, now)
+                .map { it.status }
+        assertEquals(
+            listOf(TaskCompletionStatus.COMPLETED) + List(3) { TaskCompletionStatus.UPCOMING },
+            statuses(listOf(event)),
+        )
+        val correction = event.copy(id = "undo", kind = EventKind.RETRACT, targetId = event.id)
+        assertEquals(List(4) { TaskCompletionStatus.UPCOMING }, statuses(listOf(event, correction)))
+        assertEquals(tomorrow, event.date)
+        assertEquals(now.toEpochMilli(), event.clientMillis)
+    }
+
+    @Test
     fun deletedOccurrencesAreExcludedAndRestorationRestoresTheirConfirmation() {
         val deletion =
             ItemOperation(

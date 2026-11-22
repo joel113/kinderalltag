@@ -8,6 +8,8 @@ enum class Frequency {
     ONCE,
     DAILY,
     WEEKDAYS,
+    WEEKS,
+    MONTHS,
 }
 
 enum class BearColor(val argb: Long) {
@@ -54,8 +56,15 @@ data class TaskRevision(
     val authorId: String = "",
     val responsibleParentId: String? = null,
     val slotOrigins: List<String> = emptyList(),
+    val interval: Int = 1,
 ) {
     fun validate() {
+        require(interval in 1..1000) { "Intervall: 1 bis 1000." }
+        require(
+            frequency in setOf(Frequency.DAILY, Frequency.WEEKS, Frequency.MONTHS) || interval == 1
+        ) {
+            "Einmalige Aufgaben und feste Wochentage haben kein zusätzliches Intervall."
+        }
         require(taskId.isNotBlank() && childId.isNotBlank()) { "Bitte ein Kind auswählen." }
         require(title.isNotBlank() && title.length <= 120) { "Titel: 1 bis 120 Zeichen." }
         require(notes.length <= 2000) { "Notizen: höchstens 2000 Zeichen." }
@@ -77,9 +86,48 @@ data class TaskRevision(
             (end == null || date <= end) &&
             when (frequency) {
                 Frequency.ONCE -> date == start
-                Frequency.DAILY -> true
+                Frequency.DAILY ->
+                    java.time.temporal.ChronoUnit.DAYS.between(start, date) % interval == 0L
                 Frequency.WEEKDAYS -> date.dayOfWeek in weekdays
+                Frequency.WEEKS ->
+                    java.time.temporal.ChronoUnit.DAYS.between(start, date) % (7L * interval) == 0L
+                Frequency.MONTHS -> {
+                    val months =
+                        java.time.temporal.ChronoUnit.MONTHS.between(
+                            YearMonth.from(start),
+                            YearMonth.from(date),
+                        )
+                    months % interval == 0L && date == start.plusMonths(months)
+                }
             }
+
+    fun nextDueDate(from: LocalDate): LocalDate? {
+        if (!active) return null
+        val first = maxOf(from, start, effective)
+        if (end != null && first > end) return null
+        val candidate =
+            when (frequency) {
+                Frequency.ONCE -> start.takeIf { it >= first }
+                Frequency.WEEKDAYS -> (0L..6L).map(first::plusDays).firstOrNull(::isDue)
+                Frequency.DAILY,
+                Frequency.WEEKS -> {
+                    val period = interval.toLong() * if (frequency == Frequency.WEEKS) 7 else 1
+                    val elapsed = java.time.temporal.ChronoUnit.DAYS.between(start, first)
+                    start.plusDays(((elapsed + period - 1) / period) * period)
+                }
+                Frequency.MONTHS -> {
+                    val elapsed =
+                        java.time.temporal.ChronoUnit.MONTHS.between(
+                            YearMonth.from(start),
+                            YearMonth.from(first),
+                        )
+                    val months = (elapsed / interval) * interval
+                    val initial = start.plusMonths(months)
+                    if (initial >= first) initial else start.plusMonths(months + interval)
+                }
+            }
+        return candidate?.takeIf { end == null || it <= end }
+    }
 }
 
 data class Occurrence(
@@ -160,15 +208,7 @@ object Schedule {
             .sortedWith(compareBy<Occurrence> { it.time }.thenBy { it.revision.title })
 
     fun upcomingTasks(revisions: List<TaskRevision>, today: LocalDate): List<TaskRevision> =
-        revisionsOn(revisions, today.plusDays(1)).filter { task ->
-            val first = maxOf(today, task.start, task.effective)
-            task.active &&
-                when (task.frequency) {
-                    Frequency.ONCE -> task.start >= first && task.isDue(task.start)
-                    Frequency.DAILY -> task.isDue(first)
-                    Frequency.WEEKDAYS -> (0L..6L).any { task.isDue(first.plusDays(it)) }
-                }
-        }
+        revisionsOn(revisions, today.plusDays(1)).filter { it.nextDueDate(today) != null }
 
     fun activeCompletions(events: List<CareEvent>, occurrenceId: String): List<CareEvent> {
         val relevant = events.filter { it.occurrenceId == occurrenceId }

@@ -330,7 +330,7 @@ object ManagedTasks {
         return draft.copy(slotOrigins = wanted.indices.map { assigned[it] ?: wanted[it] })
     }
 
-    // Inspect one weekly cycle after each finite boundary instead of imposing a future horizon.
+    // Inspect recurrence dates around every finite boundary, without a fixed search horizon.
     fun futureOccurrences(
         revisions: List<TaskRevision>,
         events: List<CareEvent>,
@@ -358,9 +358,20 @@ object ManagedTasks {
                 }
             }
         events.filter { it.occurrenceId.startsWith("${taskId}_") }.forEach { boundaries += it.date }
+        val schedules =
+            revisions.filter { it.taskId == taskId } +
+                operations
+                    .filter { it.type == ItemType.TASK && it.itemId == taskId }
+                    .mapNotNull { it.task }
         return boundaries
             .filter { it >= today }
-            .flatMap { boundary -> (0L..7L).map(boundary::plusDays) }
+            .flatMap { boundary ->
+                listOf(boundary) +
+                    schedules.flatMap { schedule ->
+                        val next = schedule.nextDueDate(boundary)
+                        listOfNotNull(next, next?.let { schedule.nextDueDate(it.plusDays(1)) })
+                    }
+            }
             .distinct()
             .flatMap { occurrences(revisions, events, operations, it) }
             .filter { it.revision.taskId == taskId && it.instant > now }
