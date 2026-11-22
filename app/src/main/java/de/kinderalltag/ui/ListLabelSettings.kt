@@ -16,7 +16,7 @@ import java.util.UUID
 @Composable
 internal fun ListLabelSettings(state: FamilyState, vm: FamilyViewModel, busy: Boolean) {
     var open by remember { mutableStateOf(false) }
-    SettingsSection("Labels", Icons.AutoMirrored.Filled.Label, GardenColors.Green) {
+    SettingsSection("Labels", Icons.AutoMirrored.Filled.Label, AppTheme.colors.accent) {
         Text("Gemeinsame Labels für eure Einkäufe, Geschenkanlässe und Schenkenden.")
         OutlinedButton(onClick = { open = true }) { Text("Labels verwalten") }
     }

@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState == null) receiveCalendar(intent)
         setContent {
-            KinderTheme {
+            AppThemeHost {
                 val repository = (application as KinderApplication).repository
                 if (repository == null) {
                     SetupScreen()
@@ -174,15 +174,24 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun SetupScreen() {
-    GardenBackground(Modifier.fillMaxSize()) {
+    AppBackground(Modifier.fillMaxSize()) {
         Column(
             Modifier.safeDrawingPadding().padding(28.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Text("Kinderalltag", style = MaterialTheme.typography.headlineLarge)
-            GardenBanner(
+            AppBanner(
                 "Ein gemeinsamer Blick auf euren Tag.",
-                "Kleine Aufgaben für euren Familiengarten.",
+                when (AppTheme.definition.id) {
+                    AppThemeId.GARDEN -> "Kleine Aufgaben für euren Familiengarten."
+                    AppThemeId.PLAY -> "Spielend gemeinsam durch euren Tag."
+                    AppThemeId.SPACE -> "Gemeinsam auf Alltagsmission."
+                    AppThemeId.ANIMALS -> "Tierisch gut gemeinsam durch euren Tag."
+                    AppThemeId.VEHICLES -> "Gemeinsam durch den Alltag rollen."
+                    AppThemeId.NATURE -> "Gemeinsam durch euren Alltag wachsen."
+                    AppThemeId.FARM -> "Gemeinsam euren Familienalltag ernten."
+                    AppThemeId.MAGIC -> "Ein bisschen Alltagszauber für eure Familie."
+                },
             )
             Text(
                 "Die Firebase-Verbindung ist noch nicht eingerichtet. Bitte google-services.json im app-Ordner ergänzen und die App neu bauen. Die Anleitung steht in docs/SETUP.md."

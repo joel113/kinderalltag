@@ -66,7 +66,7 @@ private enum class AppPage(val title: String) {
     SETTINGS("Einstellungen"),
 }
 
-private val green = GardenColors.Green
+private val green = StatusColors.success
 
 private val taskEncouragements =
     listOf(
@@ -134,7 +134,7 @@ private fun TagesgartenPreview() {
                         )
                     ),
             )
-        GardenBackground(Modifier.fillMaxSize()) {
+        AppBackground(Modifier.fillMaxSize()) {
             Checklist(
                 state,
                 date,
@@ -148,44 +148,6 @@ private fun TagesgartenPreview() {
 }
 
 @Composable
-fun KinderTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme =
-            lightColorScheme(
-                primary = GardenColors.Blue,
-                onPrimary = Color.White,
-                secondary = GardenColors.Coral,
-                onSecondary = Color.White,
-                tertiary = GardenColors.Green,
-                onTertiary = Color.White,
-                background = GardenColors.Cream,
-                onBackground = GardenColors.Ink,
-                surface = GardenColors.Cream,
-                onSurface = GardenColors.Ink,
-                surfaceContainer = Color(0xFFFFF0CF),
-                surfaceVariant = GardenColors.Mint,
-                onSurfaceVariant = Color(0xFF505B50),
-                primaryContainer = GardenColors.Sky,
-                onPrimaryContainer = Color(0xFF184966),
-                secondaryContainer = GardenColors.Blush,
-                onSecondaryContainer = GardenColors.Burgundy,
-                tertiaryContainer = GardenColors.Mint,
-                onTertiaryContainer = GardenColors.Green,
-                outline = Color(0xFF7F8375),
-                outlineVariant = Color(0xFFD6D4BD),
-            ),
-        shapes =
-            Shapes(
-                small = RoundedCornerShape(14.dp),
-                medium = RoundedCornerShape(20.dp),
-                large = RoundedCornerShape(26.dp),
-                extraLarge = RoundedCornerShape(32.dp),
-            ),
-        content = content,
-    )
-}
-
-@Composable
 fun KinderApp(
     vm: FamilyViewModel,
     initialDate: String?,
@@ -195,7 +157,7 @@ fun KinderApp(
     onSignIn: () -> Unit,
     onSignOut: () -> Unit,
     initialPage: String? = null,
-) = KinderTheme {
+) {
     val context = LocalContext.current
     val displayPreferences =
         remember(context) {
@@ -243,7 +205,7 @@ fun KinderApp(
         }
     }
     if (state.uid == null || !state.authorized) {
-        GardenBackground(Modifier.fillMaxSize()) {
+        AppBackground(Modifier.fillMaxSize()) {
             Column(
                 Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -254,7 +216,7 @@ fun KinderApp(
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                 )
-                GardenBanner(
+                AppBanner(
                     "Zusammen wächst der Alltag.",
                     "Für Ferdinand und Johann – und für euch beide.",
                 )
@@ -288,7 +250,7 @@ fun KinderApp(
                 }
             }
         }
-        return@KinderTheme
+        return
     }
     var tab by rememberSaveable {
         mutableStateOf(
@@ -405,8 +367,13 @@ fun KinderApp(
             Icons.Default.ShoppingBasket,
         )
     val navColors =
-        listOf(GardenColors.Green, GardenColors.Blue, GardenColors.Burgundy, GardenColors.Green)
-    GardenBackground(Modifier.fillMaxSize()) {
+        listOf(
+            AppTheme.colors.accent,
+            AppTheme.colors.primary,
+            AppTheme.colors.deepAccent,
+            AppTheme.colors.accent,
+        )
+    AppBackground(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snack) },
@@ -425,7 +392,7 @@ fun KinderApp(
                                             contentDescription = "Weitere Seiten öffnen"
                                         },
                                 ) {
-                                    GardenDrawing(GardenMotif.SPROUT, Modifier.size(34.dp))
+                                    AppIllustration(IllustrationRole.BRAND, Modifier.size(34.dp))
                                 }
                                 DropdownMenu(
                                     expanded = moreMenuExpanded,
@@ -437,7 +404,7 @@ fun KinderApp(
                                             Icon(
                                                 Icons.Default.CardGiftcard,
                                                 null,
-                                                tint = GardenColors.Coral,
+                                                tint = AppTheme.colors.secondary,
                                             )
                                         },
                                         onClick = {
@@ -453,7 +420,7 @@ fun KinderApp(
                                             Icon(
                                                 Icons.Default.History,
                                                 null,
-                                                tint = GardenColors.Coral,
+                                                tint = AppTheme.colors.secondary,
                                             )
                                         },
                                         onClick = {
@@ -467,7 +434,7 @@ fun KinderApp(
                                             Icon(
                                                 Icons.Default.BarChart,
                                                 null,
-                                                tint = GardenColors.Green,
+                                                tint = AppTheme.colors.accent,
                                             )
                                         },
                                         onClick = {
@@ -481,7 +448,7 @@ fun KinderApp(
                                             Icon(
                                                 Icons.Default.DeleteOutline,
                                                 null,
-                                                tint = GardenColors.Coral,
+                                                tint = AppTheme.colors.secondary,
                                             )
                                         },
                                         onClick = {
@@ -494,7 +461,7 @@ fun KinderApp(
                             Text(
                                 if (tab in primaryPages) "Kinderalltag" else tab.title,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = green,
+                                color = AppTheme.colors.accent,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -524,7 +491,7 @@ fun KinderApp(
                 )
             },
             bottomBar = {
-                NavigationBar(containerColor = GardenColors.Cream, tonalElevation = 0.dp) {
+                NavigationBar(containerColor = AppTheme.colors.background, tonalElevation = 0.dp) {
                     nav.forEachIndexed { index, destination ->
                         NavigationBarItem(
                             selected = tab == destination,
@@ -687,7 +654,7 @@ fun KinderApp(
                             label = { Text("Alle") },
                         )
                         state.sections.forEach { child ->
-                            GardenChildChip(child, selectedChild == child.id) {
+                            AppChildChip(child, selectedChild == child.id) {
                                 selectedChild = child.id
                                 taskPage = 0
                             }
@@ -953,7 +920,7 @@ fun KinderApp(
 }
 
 @Composable
-private fun Checklist(
+internal fun Checklist(
     state: FamilyState,
     date: LocalDate,
     today: LocalDate,
@@ -1058,11 +1025,11 @@ private fun Checklist(
             Card(
                 Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, GardenColors.Sage),
+                border = BorderStroke(1.dp, AppTheme.colors.outline),
                 colors =
                     CardDefaults.cardColors(
-                        containerColor = GardenColors.Mint,
-                        contentColor = GardenColors.Ink,
+                        containerColor = AppTheme.colors.accentContainer,
+                        contentColor = AppTheme.colors.ink,
                     ),
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1078,8 +1045,8 @@ private fun Checklist(
                                 shape = RoundedCornerShape(16.dp),
                                 colors =
                                     IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = GardenColors.Green.copy(alpha = 0.12f),
-                                        contentColor = GardenColors.Green,
+                                        containerColor = AppTheme.colors.accent.copy(alpha = 0.12f),
+                                        contentColor = AppTheme.colors.accent,
                                     ),
                             ) {
                                 Icon(
@@ -1101,8 +1068,8 @@ private fun Checklist(
                                 shape = RoundedCornerShape(16.dp),
                                 colors =
                                     IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = GardenColors.Green.copy(alpha = 0.12f),
-                                        contentColor = GardenColors.Green,
+                                        containerColor = AppTheme.colors.accent.copy(alpha = 0.12f),
+                                        contentColor = AppTheme.colors.accent,
                                     ),
                             ) {
                                 Icon(
@@ -1138,13 +1105,13 @@ private fun Checklist(
                         ) {
                             Text(
                                 "$appointmentsFinished von ${appointments.size} Termine absolviert",
-                                color = GardenColors.Blue,
+                                color = AppTheme.colors.primary,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             DayProgressBar(
                                 if (appointments.isEmpty()) 1f
                                 else appointmentsFinished.toFloat() / appointments.size,
-                                GardenColors.Blue,
+                                AppTheme.colors.primary,
                             )
                         }
                     }
@@ -1205,14 +1172,14 @@ private fun Checklist(
                                 BorderStroke(
                                     1.dp,
                                     if (completed.isEmpty()) childColor(child).copy(alpha = 0.25f)
-                                    else GardenColors.Sage,
+                                    else AppTheme.colors.outline,
                                 ),
                             colors =
                                 CardDefaults.cardColors(
                                     containerColor =
                                         if (completed.isEmpty()) childPaper(child)
-                                        else GardenColors.Mint,
-                                    contentColor = GardenColors.Ink,
+                                        else StatusColors.successSurface,
+                                    contentColor = AppTheme.colors.ink,
                                 ),
                         ) {
                             Row(
@@ -1285,7 +1252,7 @@ private fun Checklist(
             }
         }
         if (vm != null) shoppingHome(state, vm, busy)
-        item { EndOfPageFooter(GardenMotif.WORM) }
+        item { EndOfPageFooter(IllustrationRole.FRIEND) }
     }
 }
 
@@ -1299,7 +1266,7 @@ private fun DayProgressBar(progress: Float, color: Color) {
         Icon(
             Icons.Default.WbSunny,
             contentDescription = null,
-            tint = GardenColors.Mustard,
+            tint = StatusColors.yellow,
             modifier = Modifier.size(20.dp),
         )
         LinearProgressIndicator(
@@ -1311,7 +1278,7 @@ private fun DayProgressBar(progress: Float, color: Color) {
         Icon(
             Icons.Default.DarkMode,
             contentDescription = null,
-            tint = GardenColors.Mustard,
+            tint = StatusColors.yellow,
             modifier = Modifier.size(20.dp),
         )
     }
@@ -1324,21 +1291,21 @@ private fun completionText(event: CareEvent, formats: DateTimeFormats): String =
 private fun EmptyCard(text: String) {
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF0CF)),
+        colors = CardDefaults.cardColors(containerColor = AppTheme.colors.householdSurface),
     ) {
         Row(
             Modifier.padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            GardenDrawing(GardenMotif.SPROUT, Modifier.size(48.dp))
+            AppIllustration(IllustrationRole.BRAND, Modifier.size(48.dp))
             Text(text, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun GardenChildChip(child: Child, selected: Boolean, onClick: () -> Unit) {
+private fun AppChildChip(child: Child, selected: Boolean, onClick: () -> Unit) {
     FilterChip(
         selected,
         onClick,
@@ -1444,7 +1411,7 @@ private fun TaskList(
         contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (showIntroduction) item { GardenBanner("Euer Alltagshelfer", encouragement) }
+        if (showIntroduction) item { AppBanner("Euer Alltagshelfer", encouragement) }
         if (showCalendar)
             item {
                 CalendarOverviewCard(
@@ -1454,7 +1421,7 @@ private fun TaskList(
                     calendarPreviews,
                     "Alle Aufgaben anzeigen",
                     onCalendarChange,
-                    GardenColors.Green,
+                    AppTheme.colors.accent,
                 )
             }
         if (tasks.isEmpty())
@@ -1505,7 +1472,7 @@ private fun TaskList(
                 colors =
                     CardDefaults.cardColors(
                         containerColor = childPaper(child),
-                        contentColor = GardenColors.Ink,
+                        contentColor = AppTheme.colors.ink,
                     ),
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1523,7 +1490,7 @@ private fun TaskList(
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f),
                         )
-                        Icon(Icons.Default.ChevronRight, null, tint = GardenColors.Blue)
+                        Icon(Icons.Default.ChevronRight, null, tint = AppTheme.colors.primary)
                     }
                     val timing = timings[task.taskId]
                     if (task.frequency == Frequency.ONCE)
@@ -1549,7 +1516,7 @@ private fun TaskList(
                     else if (!editableTask.active)
                         Text(
                             "Pausiert",
-                            color = GardenColors.Coral,
+                            color = AppTheme.colors.secondary,
                             style = MaterialTheme.typography.bodySmall,
                         )
                 }
@@ -1569,7 +1536,7 @@ private fun TaskList(
                 onReset = { onPageChange(0) },
             )
         }
-        item { EndOfPageFooter(GardenMotif.HEART) }
+        item { EndOfPageFooter(IllustrationRole.AFFECTION) }
     }
     details?.let { selection ->
         TaskDefinitionDialog(
@@ -1628,7 +1595,7 @@ internal fun frequencyLabel(frequency: Frequency, interval: Int = 1) =
     }
 
 @Composable
-private fun OccurrenceDialog(
+internal fun OccurrenceDialog(
     occurrence: Occurrence,
     state: FamilyState,
     today: LocalDate,
@@ -1660,7 +1627,7 @@ private fun OccurrenceDialog(
         onDismiss,
         actions = {
             saveError?.let {
-                Text(it, color = GardenColors.Red, style = MaterialTheme.typography.bodySmall)
+                Text(it, color = StatusColors.error, style = MaterialTheme.typography.bodySmall)
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (occurrence.instant > Instant.now() && completed.isEmpty())
@@ -1709,7 +1676,7 @@ private fun OccurrenceDialog(
                 }
         },
     ) {
-        DetailSection("Auf einen Blick", GardenColors.Mint) {
+        DetailSection("Auf einen Blick", AppTheme.colors.accentContainer) {
             DetailValue(
                 Icons.Default.Face,
                 "Bereich",
@@ -1732,7 +1699,7 @@ private fun OccurrenceDialog(
         }
         TaskCompletionOverview(occurrence.revision.taskId, state, now, occurrence.date)
         if (occurrence.revision.notes.isNotBlank())
-            DetailSection("Notizen", GardenColors.Cream) { Text(occurrence.revision.notes) }
+            DetailSection("Notizen", AppTheme.colors.background) { Text(occurrence.revision.notes) }
         if (!visible)
             DetailNotice(
                 "Diese Ausführung wurde geändert, gelöscht oder verschoben. Bitte schließen und die Übersicht neu öffnen."
@@ -1752,7 +1719,7 @@ private fun OccurrenceDialog(
                     "Eine nachträgliche Bestätigung zeichnet den jetzigen Zeitpunkt auf.",
                     style = MaterialTheme.typography.bodySmall,
                 )
-            DetailSection("Erledigt von", GardenColors.Cream) {
+            DetailSection("Erledigt von", AppTheme.colors.background) {
                 Column(
                     Modifier.selectableGroup(),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -1777,7 +1744,7 @@ private fun OccurrenceDialog(
             }
         }
         if (events.isNotEmpty())
-            DetailSection("Bestätigungen & Korrekturen", GardenColors.Cream) {
+            DetailSection("Bestätigungen & Korrekturen", AppTheme.colors.background) {
                 events.forEachIndexed { index, event ->
                     if (index > 0) HorizontalDivider()
                     Text(
@@ -1912,10 +1879,13 @@ private fun Settings(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            GardenBanner("Euer Familiengarten", "Alles, was euren Kinderalltag persönlich macht.")
+            AppBanner(
+                AppTheme.definition.settingsTitle,
+                "Alles, was euren Kinderalltag persönlich macht.",
+            )
         }
         item {
-            SettingsSection("Dein Konto", Icons.Default.AccountCircle, GardenColors.Green) {
+            SettingsSection("Dein Konto", Icons.Default.AccountCircle, AppTheme.colors.accent) {
                 Text(
                     state.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -1936,7 +1906,9 @@ private fun Settings(
             }
         }
         item {
-            SettingsSection("Darstellung", Icons.Default.Palette, GardenColors.Burgundy) {
+            SettingsSection("Darstellung", Icons.Default.Palette, AppTheme.colors.deepAccent) {
+                ThemePicker()
+                HorizontalDivider()
                 SettingsToggle(
                     "Alltagsgedanken anzeigen",
                     "Zeigt die wechselnden Texte in Aufgaben, Termine, Einkaufsliste und Geschenkideen.",
@@ -1953,7 +1925,7 @@ private fun Settings(
             }
         }
         item {
-            SettingsSection("Startseite", Icons.Default.Home, GardenColors.Green) {
+            SettingsSection("Startseite", Icons.Default.Home, AppTheme.colors.accent) {
                 SettingsToggle(
                     "Vergangene Aufgaben anzeigen",
                     "Zeigt noch offene Aufgaben aus vergangenen Tagen auf der Startseite.",
@@ -2048,7 +2020,11 @@ private fun Settings(
         }
         item { ListLabelSettings(state, vm, busy) }
         item {
-            SettingsSection("Benachrichtigungen", Icons.Default.Notifications, GardenColors.Blue) {
+            SettingsSection(
+                "Benachrichtigungen",
+                Icons.Default.Notifications,
+                AppTheme.colors.primary,
+            ) {
                 SettingsToggle(
                     "Erinnerungen",
                     "An deine fälligen Aufgaben und Termine – auch bei Zuständigkeit für beide Eltern.",
@@ -2103,7 +2079,7 @@ private fun Settings(
             }
         }
         item {
-            SettingsSection("Eure Kinder", Icons.Default.ChildCare, GardenColors.Coral) {
+            SettingsSection("Eure Kinder", Icons.Default.ChildCare, AppTheme.colors.secondary) {
                 Text(
                     "Ein eigener Bär und eine Lieblingsfarbe für jedes Kind.",
                     style = MaterialTheme.typography.bodySmall,
@@ -2136,7 +2112,11 @@ private fun Settings(
             }
         }
         item {
-            SettingsSection("Euer Tagesrhythmus", Icons.Default.WbSunny, GardenColors.Burgundy) {
+            SettingsSection(
+                "Euer Tagesrhythmus",
+                Icons.Default.WbSunny,
+                AppTheme.colors.deepAccent,
+            ) {
                 Text("Familienzeitzone: Europe/Berlin", style = MaterialTheme.typography.titleSmall)
                 Text(
                     "Tageswechsel und Erinnerungen richten sich auch auf Reisen nach eurer Familienzeit.",
@@ -2145,7 +2125,11 @@ private fun Settings(
             }
         }
         item {
-            SettingsSection("Über Kinderalltag", Icons.Default.Favorite, GardenColors.Coral) {
+            SettingsSection(
+                "Über Kinderalltag",
+                Icons.Default.Favorite,
+                AppTheme.colors.secondary,
+            ) {
                 Text(
                     "Ein gemeinsamer Blick auf die kleinen und großen Aufgaben eurer Familie.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -2179,7 +2163,7 @@ private fun Settings(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-        item { EndOfPageFooter(GardenMotif.HEART) }
+        item { EndOfPageFooter(IllustrationRole.AFFECTION) }
     }
     if (showImpressum) ImpressumDialog { showImpressum = false }
     rename?.let { child ->
@@ -2234,7 +2218,7 @@ private fun Settings(
                                                 .background(Color(choice.argb), CircleShape)
                                                 .border(
                                                     if (choice == bearColor) 3.dp else 0.dp,
-                                                    if (choice == bearColor) GardenColors.Ink
+                                                    if (choice == bearColor) AppTheme.colors.ink
                                                     else Color.Transparent,
                                                     CircleShape,
                                                 ),
@@ -2246,7 +2230,7 @@ private fun Settings(
                                                     null,
                                                     tint =
                                                         if (choice == BearColor.HONEY)
-                                                            GardenColors.Ink
+                                                            AppTheme.colors.ink
                                                         else Color.White,
                                                 )
                                         }
@@ -2347,7 +2331,7 @@ private fun TaskEditor(
                 dismissOnClickOutside = !busy,
             ),
     ) {
-        GardenBackground(Modifier.fillMaxSize()) {
+        AppBackground(Modifier.fillMaxSize()) {
             Column(Modifier.safeDrawingPadding().imePadding()) {
                 TopAppBar(
                     title = {
@@ -2368,11 +2352,11 @@ private fun TaskEditor(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            GardenDrawing(GardenMotif.WATERING_CAN, Modifier.size(56.dp))
+                            AppIllustration(IllustrationRole.HELPER, Modifier.size(56.dp))
                             Text(
                                 "Platz für einen kleinen Alltagshelfer.",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = GardenColors.Blue,
+                                color = AppTheme.colors.primary,
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -2401,7 +2385,7 @@ private fun TaskEditor(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             children.forEach { child ->
-                                GardenChildChip(child, childId == child.id) { childId = child.id }
+                                AppChildChip(child, childId == child.id) { childId = child.id }
                             }
                         }
                     }
@@ -2612,8 +2596,8 @@ private fun YellowAddButton(label: String, modifier: Modifier = Modifier, onClic
         modifier = modifier,
         icon = { Icon(Icons.Default.Add, null) },
         text = { Text(label, fontWeight = FontWeight.Bold) },
-        containerColor = GardenColors.Mustard,
-        contentColor = GardenColors.Ink,
+        containerColor = StatusColors.yellow,
+        contentColor = AppTheme.colors.ink,
         shape = RoundedCornerShape(22.dp),
     )
 }

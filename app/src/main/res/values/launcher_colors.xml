@@ -1,0 +1,10 @@
+<resources>
+    <color name="launcher_garden_background">#FFF8E8</color>
+    <color name="launcher_play_background">#FFF9EF</color>
+    <color name="launcher_space_background">#F4F1FF</color>
+    <color name="launcher_animals_background">#F1F6E9</color>
+    <color name="launcher_vehicles_background">#F6F7EC</color>
+    <color name="launcher_farm_background">#FFF8E7</color>
+    <color name="launcher_nature_background">#F0F7F3</color>
+    <color name="launcher_magic_background">#FFF4FA</color>
+</resources>

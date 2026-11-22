@@ -15,6 +15,7 @@ Open this directory in Android Studio, select JDK 17 or 21 for Gradle, and insta
 Without `app/google-services.json`, the app builds into a setup screen. With configuration it supports:
 
 - Shared today view, grouped by child, with completion details and the current shopping list.
+- Garden, Play, light Space, Animal, Vehicle, Nature, Farm and Magic themes with locally drawn illustrations and matching bear variants and launcher icons, selectable per phone.
 - Optionally retain unfinished past tasks on the home screen for 1–365 days (default 7); a Settings switch hides them without resetting the period. Recurring tasks retain only the latest due execution.
 - Optional future tasks integrated into the home task list: choose 1–50 tasks within the next 1–365 days under Einstellungen → Startseite (default preview range: 7 days).
 - Undated shopping and gift lists, configurable labels and offline purchase checkboxes.

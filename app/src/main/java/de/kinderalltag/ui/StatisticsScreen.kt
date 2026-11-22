@@ -61,7 +61,7 @@ internal fun StatisticsScreen(
         contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { GardenBanner("Euer Alltag in Zahlen", "Kleine Schritte, die euren Alltag tragen.") }
+        item { AppBanner("Euer Alltag in Zahlen", "Kleine Schritte, die euren Alltag tragen.") }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -84,8 +84,8 @@ internal fun StatisticsScreen(
             Card(
                 colors =
                     CardDefaults.cardColors(
-                        containerColor = GardenColors.Mint,
-                        contentColor = GardenColors.Ink,
+                        containerColor = AppTheme.colors.accentContainer,
+                        contentColor = AppTheme.colors.ink,
                     )
             ) {
                 Row(
@@ -105,8 +105,8 @@ internal fun StatisticsScreen(
             Card(
                 colors =
                     CardDefaults.cardColors(
-                        containerColor = GardenColors.Sky,
-                        contentColor = GardenColors.Ink,
+                        containerColor = AppTheme.colors.primaryContainer,
+                        contentColor = AppTheme.colors.ink,
                     )
             ) {
                 Row(
@@ -219,7 +219,7 @@ internal fun StatisticsScreen(
                 onReset = { onPageChange(0) },
             )
         }
-        item { EndOfPageFooter(GardenMotif.WORM) }
+        item { EndOfPageFooter(IllustrationRole.FRIEND) }
     }
 }
 
@@ -230,7 +230,7 @@ private fun StatisticsCounter(label: String, value: Int, modifier: Modifier) {
             value.toString(),
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = GardenColors.Green,
+            color = AppTheme.colors.accent,
         )
         Text(label, style = MaterialTheme.typography.bodyMedium)
     }
@@ -243,8 +243,8 @@ private fun StatisticsBreakdown(title: String, rows: List<StatisticsRow>) {
         Modifier.fillMaxWidth(),
         colors =
             CardDefaults.cardColors(
-                containerColor = GardenColors.Cream,
-                contentColor = GardenColors.Ink,
+                containerColor = AppTheme.colors.background,
+                contentColor = AppTheme.colors.ink,
             ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -274,7 +274,7 @@ private fun StatisticsBreakdown(title: String, rows: List<StatisticsRow>) {
                         Modifier.fillMaxWidth()
                             .height(12.dp)
                             .clip(RoundedCornerShape(6.dp))
-                            .background(GardenColors.Mint)
+                            .background(AppTheme.colors.accentContainer)
                             .clearAndSetSemantics {
                                 contentDescription =
                                     row.counts.byKind.entries
@@ -361,6 +361,6 @@ private fun StatisticsPreview() {
                 ),
         )
     KinderTheme {
-        GardenBackground(Modifier.fillMaxSize()) { StatisticsScreen(state, today, 90, 0, {}, {}) }
+        AppBackground(Modifier.fillMaxSize()) { StatisticsScreen(state, today, 90, 0, {}, {}) }
     }
 }

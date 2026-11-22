@@ -14,7 +14,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun EndOfPageFooter(motif: GardenMotif, modifier: Modifier = Modifier) {
+internal fun EndOfPageFooter(motif: IllustrationRole, modifier: Modifier = Modifier) {
     Column(
         modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 24.dp).semantics(
             mergeDescendants = true
@@ -22,14 +22,14 @@ internal fun EndOfPageFooter(motif: GardenMotif, modifier: Modifier = Modifier) 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Surface(shape = CircleShape, color = GardenColors.Cream.copy(alpha = 0.9f)) {
-            GardenDrawing(motif, Modifier.padding(12.dp).size(56.dp))
+        Surface(shape = CircleShape, color = AppTheme.colors.background.copy(alpha = 0.9f)) {
+            AppIllustration(motif, Modifier.padding(12.dp).size(56.dp))
         }
         Text(
             "Du bist am Ende angekommen.",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
-            color = GardenColors.Ink,
+            color = AppTheme.colors.ink,
             textAlign = TextAlign.Center,
         )
         Text(

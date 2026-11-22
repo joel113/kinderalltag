@@ -84,7 +84,7 @@ internal fun FamilyListPage(
     ) {
         if (showIntroduction)
             item {
-                GardenBanner(
+                AppBanner(
                     if (kind == FamilyListKind.SHOPPING) "Eure Einkaufsliste"
                     else "Eure Geschenkideen",
                     thought,
@@ -175,7 +175,8 @@ internal fun FamilyListPage(
             }
         item {
             EndOfPageFooter(
-                if (kind == FamilyListKind.SHOPPING) GardenMotif.SPROUT else GardenMotif.HEART
+                if (kind == FamilyListKind.SHOPPING) IllustrationRole.BRAND
+                else IllustrationRole.AFFECTION
             )
         }
     }
@@ -212,10 +213,10 @@ internal fun FamilyListCard(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    if (bought) GardenColors.Mint
-                    else if (item.kind == FamilyListKind.SHOPPING) GardenColors.Sky
-                    else GardenColors.Blush,
-                contentColor = GardenColors.Ink,
+                    if (bought) StatusColors.successSurface
+                    else if (item.kind == FamilyListKind.SHOPPING) AppTheme.colors.primaryContainer
+                    else AppTheme.colors.secondaryContainer,
+                contentColor = AppTheme.colors.ink,
             ),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
@@ -270,7 +271,7 @@ internal fun FamilyListCard(
             Icon(
                 Icons.Default.ChevronRight,
                 null,
-                tint = GardenColors.Blue,
+                tint = AppTheme.colors.primary,
                 modifier = Modifier.padding(top = 12.dp),
             )
         }
@@ -388,7 +389,7 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
                 }
             }
             if (item.notes.isNotBlank())
-                DetailSection("Notizen", GardenColors.Cream) { Text(item.notes) }
+                DetailSection("Notizen", AppTheme.colors.background) { Text(item.notes) }
             saveError?.let { DetailNotice(it) }
             if (!fresh)
                 DetailNotice("Dieser Eintrag wurde geändert. Bitte schließen und neu öffnen.")
@@ -406,7 +407,7 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
                         Text(
                             "„${item.title}“ wird im Papierkorb aufbewahrt. Der Kaufstatus und der Verlauf bleiben erhalten."
                         )
-                        saveError?.let { Text(it, color = GardenColors.Red) }
+                        saveError?.let { Text(it, color = StatusColors.error) }
                     }
                 },
                 confirmButton = {
@@ -419,7 +420,7 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
                             }
                         },
                     ) {
-                        Text("Löschen", color = GardenColors.Red)
+                        Text("Löschen", color = StatusColors.error)
                     }
                 },
                 dismissButton = {
@@ -512,7 +513,7 @@ private fun FamilyListEditor(
             enabled = !busy,
         )
         if (target.kind == FamilyListKind.GIFTS)
-            DetailSection("Für wen?", GardenColors.Cream) {
+            DetailSection("Für wen?", AppTheme.colors.background) {
                 listOf(
                         AppointmentRecipient.FERDINAND,
                         AppointmentRecipient.JOHANN,
@@ -536,7 +537,7 @@ private fun FamilyListEditor(
                 else it != LabelGroup.SHOPPING
             }
             .forEach { group ->
-                DetailSection(labelGroupTitle(group), GardenColors.Cream) {
+                DetailSection(labelGroupTitle(group), AppTheme.colors.background) {
                     val labels =
                         state.listLabels
                             .filter { it.group == group && (it.active || it.id in selectedLabels) }

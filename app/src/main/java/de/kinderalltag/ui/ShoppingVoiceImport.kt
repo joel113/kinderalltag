@@ -99,7 +99,7 @@ internal fun ShoppingVoiceImportDialog(state: FamilyState, vm: FamilyViewModel, 
                 }
                 .sortedBy { it.name }
         if (labels.isNotEmpty())
-            DetailSection("Gemeinsame Labels (optional)", GardenColors.Cream) {
+            DetailSection("Gemeinsame Labels (optional)", AppTheme.colors.background) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     labels.forEach { label ->
                         LabelChip(label, label.id in selectedLabels) {

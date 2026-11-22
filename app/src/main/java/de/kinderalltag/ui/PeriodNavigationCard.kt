@@ -49,11 +49,11 @@ internal fun PageNavigationCard(
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, GardenColors.Sage),
+        border = BorderStroke(1.dp, AppTheme.colors.outline),
         colors =
             CardDefaults.cardColors(
-                containerColor = GardenColors.Mint,
-                contentColor = GardenColors.Ink,
+                containerColor = AppTheme.colors.accentContainer,
+                contentColor = AppTheme.colors.ink,
             ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -69,8 +69,8 @@ internal fun PageNavigationCard(
                     shape = RoundedCornerShape(16.dp),
                     colors =
                         IconButtonDefaults.filledIconButtonColors(
-                            containerColor = GardenColors.Green.copy(alpha = 0.12f),
-                            contentColor = GardenColors.Green,
+                            containerColor = AppTheme.colors.accent.copy(alpha = 0.12f),
+                            contentColor = AppTheme.colors.accent,
                         ),
                 ) {
                     Icon(
@@ -87,7 +87,7 @@ internal fun PageNavigationCard(
                     Text(
                         title,
                         style = MaterialTheme.typography.labelLarge,
-                        color = GardenColors.Green,
+                        color = AppTheme.colors.accent,
                     )
                     Text(
                         range,
@@ -103,8 +103,8 @@ internal fun PageNavigationCard(
                     shape = RoundedCornerShape(16.dp),
                     colors =
                         IconButtonDefaults.filledIconButtonColors(
-                            containerColor = GardenColors.Green.copy(alpha = 0.12f),
-                            contentColor = GardenColors.Green,
+                            containerColor = AppTheme.colors.accent.copy(alpha = 0.12f),
+                            contentColor = AppTheme.colors.accent,
                         ),
                 ) {
                     Icon(

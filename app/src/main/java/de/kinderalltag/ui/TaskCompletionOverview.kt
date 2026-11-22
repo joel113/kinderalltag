@@ -27,9 +27,6 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
-private val trackerSage = Color(0xFFE3E6D8)
-private val trackerOutline = Color(0xFFADB69E)
-
 private fun trackerStatusLabel(status: TaskCompletionStatus) =
     when (status) {
         TaskCompletionStatus.COMPLETED -> "Bestätigt"
@@ -39,9 +36,9 @@ private fun trackerStatusLabel(status: TaskCompletionStatus) =
 
 private fun trackerStatusColor(status: TaskCompletionStatus) =
     when (status) {
-        TaskCompletionStatus.COMPLETED -> GardenColors.Green
-        TaskCompletionStatus.MISSING -> GardenColors.Red
-        TaskCompletionStatus.UPCOMING -> Color(0xFFADB3B0)
+        TaskCompletionStatus.COMPLETED -> StatusColors.success
+        TaskCompletionStatus.MISSING -> StatusColors.error
+        TaskCompletionStatus.UPCOMING -> StatusColors.upcoming
     }
 
 @Composable
@@ -51,6 +48,8 @@ internal fun TaskCompletionOverview(
     now: Instant,
     anchor: LocalDate? = null,
 ) {
+    val trackerSage = AppTheme.colors.trackerContainer
+    val trackerOutline = AppTheme.colors.trackerOutline
     val recurring =
         state.revisions.any { it.taskId == taskId && it.frequency != Frequency.ONCE } ||
             state.itemOperations.any {
@@ -80,8 +79,8 @@ internal fun TaskCompletionOverview(
     Surface(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = Color(0xFFFFFDF6),
-        contentColor = GardenColors.Ink,
+        color = AppTheme.colors.trackerPaper,
+        contentColor = AppTheme.colors.ink,
         border = BorderStroke(1.dp, trackerOutline.copy(alpha = 0.5f)),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -89,7 +88,7 @@ internal fun TaskCompletionOverview(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                GardenDrawing(GardenMotif.SUN, Modifier.size(46.dp))
+                AppIllustration(IllustrationRole.JOY, Modifier.size(46.dp))
                 Surface(
                     Modifier.weight(1f),
                     color = trackerSage,
@@ -110,13 +109,13 @@ internal fun TaskCompletionOverview(
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { monthValue = month.minusMonths(1).toString() }) {
-                    Icon(Icons.Default.ChevronLeft, "Vorheriger Monat", tint = GardenColors.Green)
+                    Icon(Icons.Default.ChevronLeft, "Vorheriger Monat", tint = StatusColors.success)
                 }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "Monat",
                         style = MaterialTheme.typography.labelSmall,
-                        color = GardenColors.Green,
+                        color = AppTheme.colors.accent,
                     )
                     Text(
                         month.format(DateTimeFormatter.ofPattern("LLLL yyyy", formats.locale)),
@@ -131,7 +130,7 @@ internal fun TaskCompletionOverview(
                     Icon(
                         Icons.Default.ChevronRight,
                         "Nächster Monat",
-                        tint = if (month < currentMonth) GardenColors.Green else trackerOutline,
+                        tint = if (month < currentMonth) AppTheme.colors.accent else trackerOutline,
                     )
                 }
             }
@@ -144,7 +143,7 @@ internal fun TaskCompletionOverview(
                             style = MaterialTheme.typography.labelSmall,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             maxLines = 1,
-                            color = GardenColors.Green,
+                            color = AppTheme.colors.accent,
                         )
                     }
                 }
@@ -201,7 +200,7 @@ internal fun TaskCompletionOverview(
             }
             selectedDay?.let { number ->
                 val day = tracker.days[number - 1]
-                Surface(shape = RoundedCornerShape(14.dp), color = GardenColors.Cream) {
+                Surface(shape = RoundedCornerShape(14.dp), color = AppTheme.colors.background) {
                     Column(
                         Modifier.fillMaxWidth().padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -250,11 +249,11 @@ internal fun TaskCompletionOverview(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                         )
-                        GardenDrawing(GardenMotif.HEART, Modifier.size(26.dp))
+                        AppIllustration(IllustrationRole.AFFECTION, Modifier.size(26.dp))
                     }
                     Surface(
                         Modifier.fillMaxWidth(),
-                        color = Color(0xFFFFFDF6),
+                        color = AppTheme.colors.trackerPaper,
                         shape = RoundedCornerShape(14.dp),
                         border = BorderStroke(1.dp, trackerOutline),
                     ) {
@@ -273,7 +272,7 @@ internal fun TaskCompletionOverview(
                                 tracker.percentage?.let { "$it %" } ?: "–",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = GardenColors.Green,
+                                color = StatusColors.success,
                             )
                         }
                     }
@@ -281,7 +280,7 @@ internal fun TaskCompletionOverview(
                         LinearProgressIndicator(
                             progress = { tracker.confirmed.toFloat() / tracker.eligible },
                             modifier = Modifier.fillMaxWidth(),
-                            color = GardenColors.Green,
+                            color = StatusColors.success,
                             trackColor = Color.White.copy(alpha = 0.7f),
                         )
                     Text(
@@ -322,6 +321,7 @@ private fun TrackerDay(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
+    val trackerOutline = AppTheme.colors.trackerOutline
     val confirmed =
         day.cells.isNotEmpty() && day.cells.all { it.status == TaskCompletionStatus.COMPLETED }
     Surface(
@@ -331,15 +331,15 @@ private fun TrackerDay(
         border =
             BorderStroke(
                 if (selected || today) 2.dp else 1.dp,
-                if (selected) GardenColors.Blue
-                else if (today) GardenColors.Green else trackerOutline.copy(alpha = 0.45f),
+                if (selected) AppTheme.colors.primary
+                else if (today) AppTheme.colors.accent else trackerOutline.copy(alpha = 0.45f),
             ),
         color =
             when {
-                confirmed -> GardenColors.Mint.copy(alpha = 0.6f)
+                confirmed -> StatusColors.successSurface.copy(alpha = 0.6f)
                 day.cells.any { it.status == TaskCompletionStatus.MISSING } ->
-                    GardenColors.Blush.copy(alpha = 0.5f)
-                else -> Color(0xFFFFFDF6)
+                    StatusColors.errorSurface.copy(alpha = 0.5f)
+                else -> AppTheme.colors.trackerPaper
             },
     ) {
         Column(
@@ -352,7 +352,7 @@ private fun TrackerDay(
                 Modifier.align(Alignment.Start).clearAndSetSemantics {},
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = if (day.cells.isEmpty()) trackerOutline else GardenColors.Ink,
+                color = if (day.cells.isEmpty()) trackerOutline else AppTheme.colors.ink,
             )
             Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.fillMaxSize().clearAndSetSemantics {}) {
@@ -384,7 +384,12 @@ private fun TrackerDay(
                     }
                 }
                 if (confirmed)
-                    Icon(Icons.Default.Check, null, Modifier.size(18.dp), tint = GardenColors.Green)
+                    Icon(
+                        Icons.Default.Check,
+                        null,
+                        Modifier.size(18.dp),
+                        tint = StatusColors.success,
+                    )
                 else if (day.cells.isEmpty())
                     Text(
                         "–",

@@ -281,7 +281,8 @@ internal fun ItemActionDialog(
             TextButton(
                 colors =
                     ButtonDefaults.textButtonColors(
-                        contentColor = if (target.deleting) GardenColors.Red else GardenColors.Blue
+                        contentColor =
+                            if (target.deleting) StatusColors.error else AppTheme.colors.primary
                     ),
                 enabled =
                     !busy &&
@@ -342,7 +343,7 @@ internal fun ItemActionDialog(
                     color =
                         if (busy || state.fromCache || state.error != null)
                             androidx.compose.ui.graphics.Color.Unspecified
-                        else if (target.deleting) GardenColors.Red else GardenColors.Blue,
+                        else if (target.deleting) StatusColors.error else AppTheme.colors.primary,
                 )
             }
         },
@@ -389,7 +390,7 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
         items(deleted, key = { it.id }) { item ->
             Card(
                 Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = GardenColors.Cream),
+                colors = CardDefaults.cardColors(containerColor = AppTheme.colors.background),
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(item.title, fontWeight = FontWeight.Bold)
@@ -418,7 +419,7 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
         items(state.listItems.filter { it.deleted }, key = { "list:${it.id}" }) { item ->
             Card(
                 Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = GardenColors.Cream),
+                colors = CardDefaults.cardColors(containerColor = AppTheme.colors.background),
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(item.title, fontWeight = FontWeight.Bold)
@@ -436,7 +437,7 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
                 }
             }
         }
-        item { EndOfPageFooter(GardenMotif.SPROUT) }
+        item { EndOfPageFooter(IllustrationRole.BRAND) }
     }
     restoringList?.let { item ->
         AlertDialog(
@@ -445,7 +446,7 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
             text = {
                 Column {
                     Text("„${item.title}“ wird mit seinem aktuellen Kaufstatus wieder sichtbar.")
-                    listError?.let { Text(it, color = GardenColors.Red) }
+                    listError?.let { Text(it, color = StatusColors.error) }
                 }
             },
             confirmButton = {

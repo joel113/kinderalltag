@@ -1,5 +1,17 @@
 # Validation
 
+## App themes
+
+Local validation: all **230 Android JVM tests** pass, together with Spotless, Android Lint and debug assembly. The preview composables compile as part of the app build.
+
+`AppThemeTest` checks stable saved IDs and Garden fallback, readable text/button contrast for all palettes, Garden palette compatibility, preserved child color choices and complete theme-specific illustration mappings. `ThemePreviews.kt` provides parameterized Garden/Play/Space/Animals/Vehicles/Nature/Farm/Magic previews for Home, display settings, task details, the monthly tracker and artwork/bear galleries. Home also has a 320dp/large-font preview. They use sample data and do not require Firebase.
+
+Device acceptance: switch **Einstellungen → Darstellung → Design** between Garten, Spielwelt, Weltraum, Tierwelt, Fahrzeugwelt, Naturwelt, Bauernhof and Magische Welt; confirm immediate changes, persistence after restart and independent choices on two phones. Check Home, tasks, appointments, shopping, gifts, history/statistics, trash, calendars, detail/edit dialogs, empty states, footers and login/setup screens. Menus and actions must retain their behavior. Switching must preserve the page, filters and editor values. Confirm both child colors stay selected and that completed/missing/error/delete colors and the sun/moon symbols retain their meaning. Verify legibility at narrow widths and large fonts. Confirm the launcher icon matches each theme, including Android themed icons when enabled, while the worm notification icon stays unchanged. Switch repeatedly, return to the launcher, and open the app using the new icon; confirm there is one app entry and it opens the same data. Check restart and an APK upgrade with a non-Garden theme selected. Test at least one older Android version and Android 13+, including Samsung One UI if available. Existing pinned shortcuts and launcher refresh delays require device checks. Verify calendar sharing/import still reaches MainActivity.
+
+`LauncherIconsTest` checks all theme transitions retain a launcher entry, repairs missing/duplicate selections, verifies manifest aliases/defaults and calendar import filters, and checks adaptive/monochrome asset references.
+
+The SDK in this workspace has no emulator system image, so compiled previews and palette tests do not establish that physical rendering/device acceptance passed. No Firestore changes are required for themes.
+
 ## Automated
 
 ```sh

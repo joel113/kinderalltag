@@ -52,7 +52,7 @@ internal fun CalendarOverviewCard(
     previews: Map<LocalDate, List<CalendarPreviewItem>>,
     clearLabel: String,
     onChange: (CalendarOverviewState) -> Unit,
-    accentColor: Color = GardenColors.Blue,
+    accentColor: Color = AppTheme.colors.primary,
 ) {
     val formats = rememberDateTimeFormats()
     val heading =
@@ -78,11 +78,11 @@ internal fun CalendarOverviewCard(
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, GardenColors.Sage),
+        border = BorderStroke(1.dp, AppTheme.colors.outline),
         colors =
             CardDefaults.cardColors(
-                containerColor = GardenColors.Cream,
-                contentColor = GardenColors.Ink,
+                containerColor = AppTheme.colors.background,
+                contentColor = AppTheme.colors.ink,
             ),
     ) {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -110,8 +110,8 @@ internal fun CalendarOverviewCard(
                     shape = RoundedCornerShape(14.dp),
                     colors =
                         IconButtonDefaults.filledIconButtonColors(
-                            containerColor = GardenColors.Green.copy(alpha = 0.12f),
-                            contentColor = GardenColors.Green,
+                            containerColor = AppTheme.colors.accent.copy(alpha = 0.12f),
+                            contentColor = AppTheme.colors.accent,
                         ),
                 ) {
                     Icon(Icons.Default.ChevronLeft, previousLabel)
@@ -129,8 +129,8 @@ internal fun CalendarOverviewCard(
                     shape = RoundedCornerShape(14.dp),
                     colors =
                         IconButtonDefaults.filledIconButtonColors(
-                            containerColor = GardenColors.Green.copy(alpha = 0.12f),
-                            contentColor = GardenColors.Green,
+                            containerColor = AppTheme.colors.accent.copy(alpha = 0.12f),
+                            contentColor = AppTheme.colors.accent,
                         ),
                 ) {
                     Icon(Icons.Default.ChevronRight, nextLabel)
@@ -201,7 +201,7 @@ internal fun CalendarOverviewCard(
                                     YearMonth.from(date) == YearMonth.from(calendar.focus)
                             val color =
                                 if (selected) Color.White
-                                else if (inMonth) GardenColors.Ink
+                                else if (inMonth) AppTheme.colors.ink
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                             val shape = RoundedCornerShape(10.dp)
                             Column(
@@ -213,11 +213,11 @@ internal fun CalendarOverviewCard(
                                     )
                                     .clip(shape)
                                     .background(
-                                        if (selected) GardenColors.Green else Color.Transparent
+                                        if (selected) AppTheme.colors.accent else Color.Transparent
                                     )
                                     .border(
                                         if (date == today && !selected) 1.dp else 0.dp,
-                                        if (date == today && !selected) GardenColors.Sage
+                                        if (date == today && !selected) AppTheme.colors.outline
                                         else Color.Transparent,
                                         shape,
                                     )

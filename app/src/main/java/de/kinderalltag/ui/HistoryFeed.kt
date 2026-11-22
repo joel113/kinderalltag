@@ -75,8 +75,8 @@ internal fun HistoryFeed(
                     Surface(
                         Modifier.fillMaxWidth().padding(top = 12.dp),
                         shape = RoundedCornerShape(20.dp),
-                        color = GardenColors.Cream,
-                        border = BorderStroke(1.dp, GardenColors.Sage.copy(alpha = 0.45f)),
+                        color = AppTheme.colors.background,
+                        border = BorderStroke(1.dp, AppTheme.colors.outline.copy(alpha = 0.45f)),
                     ) {
                         Column(
                             Modifier.padding(16.dp),
@@ -124,34 +124,34 @@ internal fun HistoryFeed(
                 onReset = { onPageChange(0) },
             )
         }
-        item { EndOfPageFooter(GardenMotif.SPROUT) }
+        item { EndOfPageFooter(IllustrationRole.BRAND) }
     }
 }
 
 internal fun historyEventColor(kind: HistoryKind): Color =
     when (kind) {
         HistoryKind.SHOPPING_ADDED,
-        HistoryKind.GIFT_ADDED -> GardenColors.Mustard
+        HistoryKind.GIFT_ADDED -> StatusColors.yellow
         HistoryKind.SHOPPING_CHANGED,
-        HistoryKind.GIFT_CHANGED -> GardenColors.Blue
+        HistoryKind.GIFT_CHANGED -> StatusColors.change
         HistoryKind.SHOPPING_BOUGHT,
-        HistoryKind.GIFT_BOUGHT -> GardenColors.Green
+        HistoryKind.GIFT_BOUGHT -> StatusColors.success
         HistoryKind.SHOPPING_REOPENED,
-        HistoryKind.GIFT_REOPENED -> GardenColors.Coral
+        HistoryKind.GIFT_REOPENED -> StatusColors.correction
         HistoryKind.SHOPPING_DELETED,
-        HistoryKind.GIFT_DELETED -> GardenColors.Coral
+        HistoryKind.GIFT_DELETED -> StatusColors.correction
         HistoryKind.SHOPPING_RESTORED,
-        HistoryKind.GIFT_RESTORED -> GardenColors.Green
-        HistoryKind.TASK_COMPLETED -> GardenColors.Green
-        HistoryKind.TASK_CORRECTED -> GardenColors.Coral
-        HistoryKind.TASK_UPDATED -> GardenColors.Blue
-        HistoryKind.APPOINTMENT_ADDED -> GardenColors.Mustard
-        HistoryKind.APPOINTMENT_CHANGED -> GardenColors.Blue
-        HistoryKind.APPOINTMENT_CANCELLED -> GardenColors.Burgundy
+        HistoryKind.GIFT_RESTORED -> StatusColors.success
+        HistoryKind.TASK_COMPLETED -> StatusColors.success
+        HistoryKind.TASK_CORRECTED -> StatusColors.correction
+        HistoryKind.TASK_UPDATED -> StatusColors.change
+        HistoryKind.APPOINTMENT_ADDED -> StatusColors.yellow
+        HistoryKind.APPOINTMENT_CHANGED -> StatusColors.change
+        HistoryKind.APPOINTMENT_CANCELLED -> StatusColors.cancelled
         HistoryKind.TASK_DELETED,
-        HistoryKind.APPOINTMENT_DELETED -> GardenColors.Coral
+        HistoryKind.APPOINTMENT_DELETED -> StatusColors.correction
         HistoryKind.TASK_RESTORED,
-        HistoryKind.APPOINTMENT_RESTORED -> GardenColors.Green
+        HistoryKind.APPOINTMENT_RESTORED -> StatusColors.success
     }
 
 @Composable
@@ -170,7 +170,7 @@ private fun HistoryEventRow(entry: HistoryEntry, state: FamilyState) {
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = historyEventColor(entry.kind).copy(alpha = 0.06f),
-        contentColor = GardenColors.Ink,
+        contentColor = AppTheme.colors.ink,
     ) {
         Row(
             Modifier.padding(14.dp),

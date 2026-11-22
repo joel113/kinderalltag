@@ -48,8 +48,8 @@ internal fun ItemDetailsDialog(
                 .widthIn(max = 560.dp)
                 .fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
-            color = GardenColors.Cream,
-            contentColor = GardenColors.Ink,
+            color = AppTheme.colors.background,
+            contentColor = AppTheme.colors.ink,
         ) {
             Column(
                 Modifier.heightIn(
@@ -72,7 +72,7 @@ internal fun ItemDetailsDialog(
                         Text(
                             kind,
                             style = MaterialTheme.typography.labelLarge,
-                            color = GardenColors.Blue,
+                            color = AppTheme.colors.primary,
                         )
                         Text(
                             title,
@@ -106,14 +106,14 @@ internal fun ItemDetailsDialog(
 @Composable
 internal fun DetailSection(
     title: String,
-    color: Color = GardenColors.Sky,
+    color: Color = AppTheme.colors.primaryContainer,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = color,
-        contentColor = GardenColors.Ink,
+        contentColor = AppTheme.colors.ink,
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -128,7 +128,7 @@ internal fun DetailValue(icon: ImageVector, label: String, value: String) {
         Icon(
             icon,
             null,
-            tint = GardenColors.Blue,
+            tint = AppTheme.colors.primary,
             modifier = Modifier.padding(top = 2.dp).size(20.dp),
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -147,13 +147,13 @@ internal fun DetailNotice(text: String) {
     Surface(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = GardenColors.Blush,
+        color = AppTheme.colors.secondaryContainer,
     ) {
         Text(
             text,
             Modifier.padding(14.dp),
             style = MaterialTheme.typography.bodySmall,
-            color = GardenColors.Ink,
+            color = AppTheme.colors.ink,
         )
     }
 }
@@ -167,7 +167,7 @@ internal fun DetailAction(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val color = if (destructive) GardenColors.Red else GardenColors.Blue
+    val color = if (destructive) StatusColors.error else AppTheme.colors.primary
     val foreground = if (enabled) color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
     OutlinedButton(
         onClick = onClick,
@@ -256,7 +256,7 @@ internal fun TaskDefinitionDialog(
             }
         },
     ) {
-        DetailSection("Auf einen Blick", GardenColors.Mint) {
+        DetailSection("Auf einen Blick", AppTheme.colors.accentContainer) {
             DetailValue(
                 Icons.Default.Face,
                 "Bereich",
@@ -298,7 +298,7 @@ internal fun TaskDefinitionDialog(
                     "${formats.fullDate(upcoming.date)} · ${formats.time(upcoming.time)}",
                 )
         }
-        DetailSection("Ausführungen", GardenColors.Cream) {
+        DetailSection("Ausführungen", AppTheme.colors.background) {
             Text(
                 "Wähle Tag und Uhrzeit, um eine Ausführung zu bestätigen – auch im Voraus.",
                 style = MaterialTheme.typography.bodySmall,
@@ -333,7 +333,7 @@ internal fun TaskDefinitionDialog(
         }
         TaskCompletionOverview(task.taskId, state, now, selection.date)
         if (task.notes.isNotBlank())
-            DetailSection("Notizen", GardenColors.Cream) { Text(task.notes) }
+            DetailSection("Notizen", AppTheme.colors.background) { Text(task.notes) }
         if (!selection.editable.active)
             DetailNotice(
                 "Diese Aufgabe ist pausiert. Mit Fortsetzen wählt ihr die nächste Ausführung."

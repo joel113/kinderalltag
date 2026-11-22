@@ -27,8 +27,8 @@ internal fun SettingsSection(
         border = BorderStroke(1.dp, color.copy(alpha = 0.2f)),
         colors =
             CardDefaults.cardColors(
-                containerColor = GardenColors.Cream,
-                contentColor = GardenColors.Ink,
+                containerColor = AppTheme.colors.background,
+                contentColor = AppTheme.colors.ink,
             ),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {

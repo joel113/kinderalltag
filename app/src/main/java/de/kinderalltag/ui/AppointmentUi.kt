@@ -70,8 +70,8 @@ internal fun AppointmentCard(
         modifier = Modifier.fillMaxWidth(),
         colors =
             CardDefaults.cardColors(
-                containerColor = GardenColors.Sky,
-                contentColor = GardenColors.Ink,
+                containerColor = AppTheme.colors.primaryContainer,
+                contentColor = AppTheme.colors.ink,
             ),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -94,7 +94,7 @@ internal fun AppointmentCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
-                Icon(Icons.Default.ChevronRight, null, tint = GardenColors.Blue)
+                Icon(Icons.Default.ChevronRight, null, tint = AppTheme.colors.primary)
             }
             Text(
                 if (details.allDay) "Ganztägig"
@@ -151,7 +151,7 @@ internal fun AppointmentAgenda(
         contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (showIntroduction) item { GardenBanner("Eure Termine", encouragement) }
+        if (showIntroduction) item { AppBanner("Eure Termine", encouragement) }
         if (showCalendar)
             item {
                 CalendarOverviewCard(
@@ -177,7 +177,7 @@ internal fun AppointmentAgenda(
                 items(occurrences, key = { it.id }) { AppointmentCard(it, state) { onOpen(it) } }
             }
         if (!calendarFiltered) item { PeriodNavigationCard(today, page, onPageChange) }
-        item { EndOfPageFooter(GardenMotif.SUN) }
+        item { EndOfPageFooter(IllustrationRole.JOY) }
     }
 }
 
@@ -302,13 +302,13 @@ internal fun AppointmentDialogs(
                     DetailValue(Icons.Default.Place, "Ort", details.location)
             }
             if (details.notes.isNotBlank())
-                DetailSection("Notizen", GardenColors.Cream) { Text(details.notes) }
+                DetailSection("Notizen", AppTheme.colors.background) { Text(details.notes) }
             Text(
                 "Im Kalender speichern öffnet deine Kalender-App zur Bestätigung. Übernommen wird nur dieser Termin als unabhängige Kopie; spätere Änderungen werden nicht automatisch abgeglichen.",
                 style = MaterialTheme.typography.bodySmall,
             )
             if (future && allowFollowing)
-                DetailSection("Änderung gilt für", GardenColors.Cream) {
+                DetailSection("Änderung gilt für", AppTheme.colors.background) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             !following,
@@ -456,7 +456,7 @@ private fun AppointmentEditor(
                 dismissOnClickOutside = !busy,
             ),
     ) {
-        GardenBackground(Modifier.fillMaxSize()) {
+        AppBackground(Modifier.fillMaxSize()) {
             Column(Modifier.safeDrawingPadding().imePadding()) {
                 TopAppBar(
                     title = {
