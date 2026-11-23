@@ -97,8 +97,10 @@ fun listItems(
     events: List<ListActivity>,
     kind: FamilyListKind,
     bought: Boolean,
+    order: List<String> = emptyList(),
 ): List<FamilyListItem> {
     val alphabet = Collator.getInstance(Locale.GERMAN)
+    val positions = order.withIndex().associate { it.value to it.index }
     return items
         .filter {
             !it.deleted && it.kind == kind && activePurchases(events, it.id).isNotEmpty() == bought
@@ -110,7 +112,8 @@ fun listItems(
                     }
                     .thenBy { it.id }
             else
-                Comparator<FamilyListItem> { a, b -> alphabet.compare(a.title, b.title) }
+                compareBy<FamilyListItem> { positions[it.id] ?: Int.MAX_VALUE }
+                    .then(Comparator { a, b -> alphabet.compare(a.title, b.title) })
                     .thenBy { it.id }
         )
 }

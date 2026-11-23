@@ -2,7 +2,7 @@
 
 ## App themes
 
-Local validation: all **242 Android JVM tests** pass, together with Spotless, Android Lint and debug assembly. The preview composables compile as part of the app build.
+Local validation: all **246 Android JVM tests** pass, together with Spotless, Android Lint and debug assembly. The preview composables compile as part of the app build.
 
 `AppThemeTest` checks stable saved IDs and Garden fallback, readable text/button contrast for all palettes, Garden palette compatibility, preserved child color choices and complete theme-specific illustration mappings. `ThemePreviews.kt` provides parameterized Garden/Play/Space/Animals/Vehicles/Nature/Farm/Magic previews for Home, display settings, task details, the monthly tracker and artwork/bear galleries. Home also has a 320dp/large-font preview. They use sample data and do not require Firebase.
 
@@ -269,7 +269,7 @@ Local checks for these changes: all **183 JVM tests pass**, including chronology
 
 ## One-off task postponement
 
-Regression tests cover opening the edit dialog with an elapsed one-off task already selected, including a previously moved task; edit eligibility and confirmation corrections; repeated moves with stable IDs and no entries left on old dates; protected completion snapshots; elapsed recurring instances; and moving a single future recurring execution into the past without changing other instances or confirmation snapshots. The Firestore emulator suite has 40 tests, including overdue ONCE/SINGLE edits and past replacement dates for individual tasks, and rejection of overdue FOLLOWING/ALL edits, invalid sources, multiple replacement slots and unauthorized writers.
+Regression tests cover opening the edit dialog with an elapsed one-off task already selected, including a previously moved task; edit eligibility and confirmation corrections; repeated moves with stable IDs and no entries left on old dates; protected completion snapshots; elapsed recurring instances; and moving a single future recurring execution into the past without changing other instances or confirmation snapshots. The Firestore emulator suite has 43 tests, including overdue ONCE/SINGLE edits and past replacement dates for individual tasks, and rejection of overdue FOLLOWING/ALL edits, invalid sources, multiple replacement slots and unauthorized writers.
 
 Phone acceptance: publish the updated rules, install the new APK on both phones, and create an unfinished one-off task whose planned time has passed. Open Aufgaben → task → Bearbeiten and press Weiter without touching the source date. Choose a past date and save; verify it disappears from the former day, appears on the selected past day on both phones, and keeps its history. Move it again to tomorrow, then back into the past. Complete it and confirm it cannot be moved; retract completion and check it can be moved again. Verify an elapsed recurring instance stays protected, future recurring edits still work, disabled Weiter looks disabled and explains why, and opening the editor during synchronization does not permit an offline save.
 
@@ -290,3 +290,15 @@ The edit/delete scope dialog now offers one selectable date-and-time card per ta
 TaskEditingTest covers same-day pagination without skipped slots, nearby choices ahead of distant moved dates, actual dates of moved executions, finite schedule boundaries and sparse/paused schedules. TaskOccurrencePicker.kt includes standard and narrow/large-text previews; phone visual acceptance remains pending.
 
 Home preview regression: enable future tasks and verify a daily task due today shows only today's execution(s), including after completion; tomorrow's execution must not appear alongside it. Repeat with weekly/monthly recurrence and multiple daily times. A future one-off and a series starting tomorrow should still appear and fill the configured preview count. Browse another home date and verify suppression follows that displayed date and the active child/parent filters. UpcomingTasksTest covers exclusion before limiting the preview and completed/uncompleted displayed-day tasks.
+
+## Notes and location indicators
+
+Task cards on Home and Aufgaben show a note icon with Notizen when the displayed task has nonblank notes. Appointment cards on Home and Termine show the same note indicator and a location pin beside the actual place when available. Verify blank/whitespace-only values show no badge, edited/moved instances use their displayed notes/place, both appointment indicators can coexist, long locations wrap at narrow widths/large fonts, and tapping anywhere on the card still opens details. Check completed tasks and all themes; the theme Home previews include notes and location sample data. No database change is required.
+
+## Shopping and gift ordering
+
+ListOrderingTest covers alphabetical compatibility, saved order and new items, independent list kinds, moves across filtered/hidden items without duplicates/loss, buying/reopening/deletion/restoration, preserved audit snapshots, and bounded/unique/valid IDs. The 43-test Firestore suite verifies both parents can share independent order documents, strict actor/schema/version/ID validation (including delimiter injection, non-string IDs, duplicates and 1000/1001 boundaries), denied outsider/unauthenticated access, and competing writes allowing only one next version. App tests, formatting, lint and debug assembly pass; physical gesture acceptance remains pending.
+
+Phone acceptance after publishing the rules: in both Einkaufsliste and Geschenkideen, drag the first item down and the last up, cancel a drag, drag past screen edges in a long list, and use tap-menu and TalkBack Nach oben/Nach unten. Verify card opening and purchase checkboxes still work. Repeat with long titles, labels, 150–200% text, child/label filters, collapsed/expanded Gekauft and all themes. Confirm filters retain hidden positions, shopping Home follows the shared order, new items append, and bought/reopened/deleted/restored items keep expected state and positions.
+
+Check persistence after relaunch and on the other phone; attempt simultaneous reorders and observe a clear conflict without lost items. Modify/buy/delete an entry or change filters while dragging, and verify stale dragging cancels. Disconnect before/during a save: ordering must be disabled or roll back with an error, and offline purchase/creation must still work. Reordering must create no purchase/activity notification, Verlauf entry or statistics count.

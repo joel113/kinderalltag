@@ -100,7 +100,7 @@ internal fun AppointmentCard(
                 if (details.allDay) "Ganztägig"
                 else formats.timeRange(details.startTime, details.endTime)
             )
-            if (details.location.isNotBlank()) Text(details.location)
+            ItemMetadataIndicators(details.notes, details.location)
             Text(
                 "Zuständig: ${responsibilityName(details.responsibleParentId, state.parents)}",
                 style = MaterialTheme.typography.bodySmall,

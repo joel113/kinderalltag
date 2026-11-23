@@ -1212,6 +1212,7 @@ internal fun Checklist(
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                     )
+                                    ItemMetadataIndicators(occurrence.revision.notes)
                                     Text(
                                         if (occurrence.date == date) formats.time(occurrence.time)
                                         else
@@ -1495,6 +1496,7 @@ private fun TaskList(
                         )
                         Icon(Icons.Default.ChevronRight, null, tint = AppTheme.colors.primary)
                     }
+                    ItemMetadataIndicators(task.notes)
                     val timing = timings[task.taskId]
                     if (task.frequency == Frequency.ONCE)
                         Text(

@@ -28,6 +28,7 @@ private val themePreviewTask =
         "routine",
         "johann",
         "Rucksack packen",
+        notes = "Wechselkleidung und Trinkflasche einpacken.",
         start = themePreviewDay.minusDays(10),
         effective = themePreviewDay.minusDays(10),
     )
@@ -78,6 +79,8 @@ private fun themePreviewState(): FamilyState {
                         themePreviewDay,
                         LocalTime.of(15, 0),
                         LocalTime.of(16, 0),
+                        location = "Spielplatz im Stadtpark",
+                        notes = "Sandspielzeug mitbringen.",
                     ),
                 )
             ),

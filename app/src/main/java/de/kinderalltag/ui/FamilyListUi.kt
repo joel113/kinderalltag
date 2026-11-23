@@ -12,11 +12,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.kinderalltag.data.FamilyState
 import de.kinderalltag.domain.*
@@ -71,14 +73,42 @@ internal fun FamilyListPage(
     val thoughts = if (kind == FamilyListKind.SHOPPING) shoppingThoughts else giftThoughts
     val thought = thoughts[(vm.listUi.thoughtIndices[kind] ?: 0) % thoughts.size]
     val busy by vm.busy.collectAsStateWithLifecycle()
-    fun visible(bought: Boolean) =
-        listItems(state.listItems, state.listActivity, kind, bought).filter {
-            (kind == FamilyListKind.SHOPPING || it.recipient?.matches(child) == true) &&
-                matchesListLabels(it, labels.toSet(), state.listLabels)
+    val order = state.listOrders.firstOrNull { it.kind == kind } ?: FamilyListOrder(kind)
+    val fullOrder =
+        remember(state.listItems, order.itemIds, kind) {
+            orderedListIds(state.listItems, kind, order.itemIds)
         }
+    val listState = rememberLazyListState()
+    val saveOrder by
+        rememberUpdatedState<(List<String>, Long, (Boolean) -> Unit) -> Unit>({ ids, version, done
+            ->
+            vm.reorderList(kind, ids, version, done)
+        })
+    val reorder =
+        remember(kind, listState) {
+            ListReorderState(listState) { ids, version, done -> saveOrder(ids, version, done) }
+        }
+    fun visible(bought: Boolean) =
+        listItems(state.listItems, state.listActivity, kind, bought, reorder.order ?: order.itemIds)
+            .filter {
+                (kind == FamilyListKind.SHOPPING || it.recipient?.matches(child) == true) &&
+                    matchesListLabels(it, labels.toSet(), state.listLabels)
+            }
     val open = visible(false)
     val bought = visible(true)
+    val canReorder =
+        state.authorized &&
+            state.loaded &&
+            !state.fromCache &&
+            !state.pending &&
+            state.error == null &&
+            !busy &&
+            !reorder.saving &&
+            fullOrder.size <= MAX_LIST_ORDER_ITEMS
+    SideEffect { reorder.update(fullOrder, open.map { it.id }, order.version, canReorder) }
+    ListReorderAutoScroll(reorder)
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -140,7 +170,22 @@ internal fun FamilyListPage(
                         }
                 }
             }
-        item { Text("${open.size} offen", fontWeight = FontWeight.SemiBold) }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("${open.size} offen", fontWeight = FontWeight.SemiBold)
+                if (open.size > 1)
+                    Text(
+                        if (reorder.saving) "Reihenfolge wird gespeichert …"
+                        else if (fullOrder.size > MAX_LIST_ORDER_ITEMS)
+                            "Die Liste ist zu groß für die manuelle Sortierung."
+                        else if (!canReorder && !busy)
+                            "Zum Sortieren ist eine aktuelle Verbindung erforderlich."
+                        else
+                            "Zum Sortieren den Griff gedrückt halten und verschieben. Antippen zeigt Pfeile zum Verschieben.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+            }
+        }
         if (open.isEmpty())
             item {
                 Text(
@@ -153,9 +198,14 @@ internal fun FamilyListPage(
             FamilyListCard(
                 item,
                 state,
-                busy,
-                onOpen = { vm.listUi.selected = item },
+                busy || reorder.draggingId != null,
+                onOpen = { if (reorder.draggingId == null) vm.listUi.selected = item },
                 onBought = { vm.buy(item, true) },
+                modifier =
+                    (if (reorder.draggingId == item.id) Modifier else Modifier.animateItem())
+                        .zIndex(if (reorder.draggingId == item.id) 1f else 0f)
+                        .graphicsLayer { translationY = reorder.offset(item.id) },
+                dragHandle = { ListDragHandle(item.id, item.title, canReorder, reorder) },
             )
         }
         item {
@@ -204,11 +254,13 @@ internal fun FamilyListCard(
     busy: Boolean,
     onOpen: () -> Unit,
     onBought: () -> Unit,
+    modifier: Modifier = Modifier,
+    dragHandle: (@Composable () -> Unit)? = null,
 ) {
     val bought = activePurchases(state.listActivity, item.id).isNotEmpty()
     Card(
         onClick = onOpen,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors =
             CardDefaults.cardColors(
@@ -220,6 +272,7 @@ internal fun FamilyListCard(
             ),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+            dragHandle?.invoke()
             Checkbox(
                 bought,
                 { onBought() },
@@ -298,7 +351,14 @@ internal fun LazyListScope.shoppingHome(state: FamilyState, vm: FamilyViewModel,
             }
         }
     }
-    val open = listItems(state.listItems, state.listActivity, FamilyListKind.SHOPPING, false)
+    val open =
+        listItems(
+            state.listItems,
+            state.listActivity,
+            FamilyListKind.SHOPPING,
+            false,
+            state.listOrders.firstOrNull { it.kind == FamilyListKind.SHOPPING }?.itemIds.orEmpty(),
+        )
     if (open.isEmpty()) item { Text("Alles besorgt – eure Einkaufsliste ist leer.") }
     items(open, key = { "shopping:${it.id}" }) { item ->
         FamilyListCard(item, state, busy, { vm.listUi.selected = item }, { vm.buy(item, true) })

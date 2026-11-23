@@ -76,6 +76,38 @@ class FamilyLists(
 ) {
     private val household = db.collection("households").document("family")
 
+    suspend fun reorder(kind: FamilyListKind, itemIds: List<String>, expectedVersion: Long) {
+        val user = requireNotNull(auth.currentUser)
+        val current = state()
+        require(current.loaded && !current.fromCache && !current.pending && current.error == null) {
+            "Zum Sortieren ist eine aktuelle Serververbindung erforderlich."
+        }
+        FamilyListOrder(kind, itemIds, expectedVersion).validate()
+        require(
+            itemIds.toSet() == current.listItems.filter { it.kind == kind }.map { it.id }.toSet()
+        ) {
+            "Die Liste wurde inzwischen geändert. Bitte erneut verschieben."
+        }
+        db.runTransaction { transaction ->
+                val ref = household.collection("listOrders").document(kind.name)
+                val saved = transaction.get(ref)
+                require((saved.getLong("version") ?: 0L) == expectedVersion) {
+                    "Die Reihenfolge wurde auf dem anderen Gerät geändert. Bitte erneut verschieben."
+                }
+                transaction.set(
+                    ref,
+                    mapOf(
+                        "kind" to kind.name,
+                        "itemIds" to itemIds,
+                        "version" to expectedVersion + 1,
+                        "authorId" to user.uid,
+                        "updatedAt" to FieldValue.serverTimestamp(),
+                    ),
+                )
+            }
+            .await()
+    }
+
     private fun event(
         item: FamilyListItem,
         action: ListAction,

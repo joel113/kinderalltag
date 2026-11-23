@@ -27,6 +27,7 @@ data class FamilyState(
     val listItems: List<FamilyListItem> = emptyList(),
     val listActivity: List<ListActivity> = emptyList(),
     val listLabels: List<FamilyLabel> = emptyList(),
+    val listOrders: List<FamilyListOrder> = emptyList(),
     val fromCache: Boolean = true,
     val pending: Boolean = false,
     val error: String? = null,
@@ -48,6 +49,7 @@ private val DATA_COLLECTIONS =
         "listItems",
         "listActivity",
         "listLabels",
+        "listOrders",
     )
 
 class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseFirestore) {
@@ -183,6 +185,22 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                                 listItems =
                                     snapshot.documents.map {
                                         decodeListItem(requireNotNull(it.data))
+                                    }
+                            )
+                    }
+                    observeCollection("listOrders") { snapshot ->
+                        mutable.value =
+                            mutable.value.copy(
+                                listOrders =
+                                    snapshot.documents.map { doc ->
+                                        FamilyListOrder(
+                                                FamilyListKind.valueOf(doc.id),
+                                                (doc.get("itemIds") as List<*>).map {
+                                                    it as String
+                                                },
+                                                requireNotNull(doc.getLong("version")),
+                                            )
+                                            .also { it.validate() }
                                     }
                             )
                     }

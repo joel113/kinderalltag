@@ -704,3 +704,55 @@ test('eight-slot interval snapshots support delegated confirmations corrections 
     }
   }
 });
+
+const listOrder = (authorId, extra = {}) => ({ kind: 'SHOPPING', itemIds: ['milk', 'bread'], version: 1,
+  authorId, updatedAt: serverTimestamp(), ...extra });
+
+test('both parents share independent list orders without changing items or activity', async () => {
+  const a = dbFor('parent-a');
+  const b = dbFor('parent-b');
+  await assertSucceeds(setDoc(doc(a, `${path}/listOrders/SHOPPING`), listOrder('parent-a')));
+  await assertSucceeds(getDoc(doc(b, `${path}/listOrders/SHOPPING`)));
+  await assertSucceeds(setDoc(doc(b, `${path}/listOrders/SHOPPING`), listOrder('parent-b', { itemIds: ['bread', 'milk'], version: 2 })));
+  await assertSucceeds(setDoc(doc(b, `${path}/listOrders/GIFTS`), listOrder('parent-b', { kind: 'GIFTS', itemIds: ['gift'] })));
+  assert.equal((await getDoc(doc(a, `${path}/listOrders/SHOPPING`))).data().version, 2);
+  assert.equal((await getDoc(doc(a, `${path}/listOrders/GIFTS`))).data().version, 1);
+  assert.equal((await getDocs(collection(a, `${path}/listActivity`))).size, 0);
+  assert.equal((await getDocs(collection(a, `${path}/listItems`))).size, 0);
+  await assertFails(deleteDoc(doc(a, `${path}/listOrders/SHOPPING`)));
+});
+
+test('list order writes validate actors versions schema and bounded unique string IDs', async () => {
+  const db = dbFor('parent-a');
+  const ref = doc(db, `${path}/listOrders/SHOPPING`);
+  for (const extra of [
+    { kind: 'GIFTS' }, { version: 0 }, { version: 2 }, { version: 1.5 }, { authorId: 'parent-b' },
+    { updatedAt: null }, { extra: true }, { itemIds: null }, { itemIds: ['same', 'same'] },
+    { itemIds: [''] }, { itemIds: ['a,b'] }, { itemIds: ['a/b'] }, { itemIds: ['x'.repeat(101)] },
+    { itemIds: [1] }, { itemIds: [true] }, { itemIds: [null] }, { itemIds: [{ id: 'x' }] },
+    { itemIds: Array.from({ length: 1001 }, (_, i) => `id-${i}`) },
+  ]) await assertFails(setDoc(ref, listOrder('parent-a', extra)));
+  await assertSucceeds(setDoc(ref, listOrder('parent-a', { itemIds: Array.from({ length: 1000 }, (_, i) => `id-${i}`) })));
+  await assertFails(setDoc(ref, listOrder('parent-a', { version: 1 })));
+  await assertFails(setDoc(ref, listOrder('parent-a', { version: 3 })));
+  await assertSucceeds(setDoc(ref, listOrder('parent-a', { version: 2, itemIds: [] })));
+  await assertFails(setDoc(doc(db, `${path}/listOrders/UNKNOWN`), listOrder('parent-a')));
+  for (const unauthorized of [dbFor('stranger'), env.unauthenticatedContext().firestore()]) {
+    await assertFails(getDocs(collection(unauthorized, `${path}/listOrders`)));
+    await assertFails(setDoc(doc(unauthorized, `${path}/listOrders/GIFTS`), listOrder('stranger', { kind: 'GIFTS' })));
+  }
+});
+
+test('simultaneous list reorders accept only one writer for the next version', async () => {
+  const db = dbFor('parent-a');
+  await setDoc(doc(db, `${path}/listOrders/SHOPPING`), listOrder('parent-a'));
+  const results = await Promise.allSettled([
+    setDoc(doc(db, `${path}/listOrders/SHOPPING`), listOrder('parent-a', { version: 2, itemIds: ['bread', 'milk'] })),
+    setDoc(doc(dbFor('parent-b'), `${path}/listOrders/SHOPPING`), listOrder('parent-b', { version: 2, itemIds: ['milk', 'bread'] })),
+  ]);
+  assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+  assert.equal(results.filter(r => r.status === 'rejected').length, 1);
+  const saved = (await getDoc(doc(db, `${path}/listOrders/SHOPPING`))).data();
+  assert.equal(saved.version, 2);
+  assert.deepEqual([...saved.itemIds].sort(), ['bread', 'milk']);
+});

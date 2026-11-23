@@ -113,6 +113,22 @@ service cloud.firestore {
         && request.resource.data.group == resource.data.group && request.resource.data.version == resource.data.version + 1;
       allow delete: if false;
     }
+    match /households/family/listOrders/{kind} {
+      function validOrder() {
+        let d = request.resource.data;
+        return exactFields(d, ['kind', 'itemIds', 'version', 'authorId', 'updatedAt'])
+          && kind in ['SHOPPING', 'GIFTS'] && d.kind == kind
+          && d.authorId == request.auth.uid && d.updatedAt == request.time
+          && d.version is int && d.itemIds is list && d.itemIds.size() <= 1000
+          && d.itemIds.toSet().size() == d.itemIds.size()
+          && (d.itemIds.size() == 0 || (d.itemIds.join(',').split(',') == d.itemIds
+            && d.itemIds.join(',').matches('^[A-Za-z0-9_-]{1,100}(,[A-Za-z0-9_-]{1,100})*$')));
+      }
+      allow read: if member();
+      allow create: if member() && validOrder() && request.resource.data.version == 1;
+      allow update: if member() && validOrder() && request.resource.data.version == resource.data.version + 1;
+      allow delete: if false;
+    }
     match /households/family/listItems/{itemId} {
       function pairedActivity() {
         let d = request.resource.data;

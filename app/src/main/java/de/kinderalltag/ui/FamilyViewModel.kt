@@ -278,6 +278,35 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
         }
     }
 
+    fun reorderList(
+        kind: FamilyListKind,
+        ids: List<String>,
+        version: Long,
+        done: (Boolean) -> Unit,
+    ) =
+        viewModelScope.launch {
+            busy.value = true
+            listError.value = null
+            try {
+                repository.lists.reorder(kind, ids, version)
+                done(true)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                listError.value =
+                    generateSequence<Throwable>(e) { it.cause }
+                        .firstOrNull {
+                            it is IllegalArgumentException || it is IllegalStateException
+                        }
+                        ?.message
+                        ?: "Reihenfolge konnte nicht gespeichert werden. Bitte Verbindung und Regeln prüfen."
+                message.value = listError.value
+                done(false)
+            } finally {
+                busy.value = false
+            }
+        }
+
     fun changeListItem(item: FamilyListItem, action: ListAction, done: () -> Unit = {}) =
         listChange {
             repository.lists.change(item, action)
