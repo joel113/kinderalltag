@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import de.kinderalltag.text.*
 
 @Composable
 internal fun ImpressumDialog(onDismiss: () -> Unit) {
@@ -17,14 +18,14 @@ internal fun ImpressumDialog(onDismiss: () -> Unit) {
     var openError by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Impressum") },
+        title = { Text(text(TextKey.LEGAL_NOTICE)) },
         text = {
             Column(
                 Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    "Herausgeber & Kontakt",
+                    text(TextKey.PUBLISHER_CONTACT),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -40,7 +41,7 @@ internal fun ImpressumDialog(onDismiss: () -> Unit) {
                                 .isFailure
                     }
                 ) {
-                    Text("E-Mail schreiben")
+                    Text(text(TextKey.SEND_EMAIL))
                 }
                 TextButton(
                     onClick = {
@@ -49,15 +50,15 @@ internal fun ImpressumDialog(onDismiss: () -> Unit) {
                                 .isFailure
                     }
                 ) {
-                    Text("Website öffnen")
+                    Text(text(TextKey.OPEN_WEBSITE))
                 }
                 if (openError)
                     Text(
-                        "Kein passendes Programm verfügbar. Du kannst die Angaben oben kopieren.",
+                        text(TextKey.NO_MATCHING_APP_AVAILABLE_YOU_CAN_COPY_THE_DETAILS_ABOVE),
                         style = MaterialTheme.typography.bodySmall,
                     )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Schließen") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(text(TextKey.CLOSE)) } },
     )
 }

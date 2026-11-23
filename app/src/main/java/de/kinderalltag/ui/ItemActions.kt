@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.kinderalltag.data.*
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.*
 import java.util.UUID
 
@@ -40,16 +41,16 @@ internal fun taskEditBlockReason(
     now: Instant,
 ): String? =
     when {
-        occurrence == null -> "Bitte eine kommende Ausführung auswählen."
+        occurrence == null -> text(TextKey.PLEASE_SELECT_AN_UPCOMING_OCCURRENCE)
         Schedule.activeCompletions(events, occurrence.id).isNotEmpty() ->
-            "Diese Ausführung wurde bereits bestätigt und bleibt unverändert. Bitte eine unbestätigte Ausführung wählen."
+            text(TextKey.THIS_OCCURRENCE_IS_ALREADY_CONFIRMED_AND_REMAINS_UNCHANGED_PLEASE_SELECT)
         occurrence.instant <= now &&
             !isOneOffTaskSource(
                 revisions,
                 occurrence.revision.taskId,
                 occurrence.sourceRevisionId,
             ) ->
-            "Die geplante Uhrzeit dieser Ausführung liegt bereits in der Vergangenheit. Aktuell lassen sich nur kommende Ausführungen bearbeiten."
+            text(TextKey.THIS_OCCURRENCE_S_SCHEDULED_TIME_IS_ALREADY_IN_THE_PAST_ONLY_UPCOMING_RE)
         else -> null
     }
 
@@ -249,7 +250,7 @@ internal fun ItemActionDialog(
     val editable = editBlockReason == null
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(if (target.deleting) "Löschen" else "Aufgabe bearbeiten") },
+        title = { Text(if (target.deleting) text(TextKey.DELETE) else text(TextKey.EDIT_TASK)) },
         text = {
             Column(
                 Modifier.heightIn(max = 500.dp).verticalScroll(rememberScrollState()),
@@ -274,12 +275,20 @@ internal fun ItemActionDialog(
                         }
                 if (task != null && scope != OperationScope.ALL) {
                     if (recurring) {
-                        Text("Welche Ausführung?", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            text(TextKey.WHICH_OCCURRENCE),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
                         Text(
                             if (target.deleting)
-                                "Wähle Datum und Uhrzeit des Eintrags, den du entfernen möchtest."
+                                text(
+                                    TextKey.SELECT_THE_DATE_AND_TIME_OF_THE_ENTRY_YOU_WANT_TO_REMOVE
+                                )
                             else
-                                "Wähle die Ausführung, die du ändern möchtest. Das neue Datum legst du anschließend fest.",
+                                text(
+                                    TextKey
+                                        .SELECT_THE_OCCURRENCE_YOU_WANT_TO_CHANGE_YOU_CAN_SET_THE_NEW_DATE_AFTERW
+                                ),
                             style = MaterialTheme.typography.bodySmall,
                         )
                         TaskOccurrenceChoices(
@@ -293,7 +302,8 @@ internal fun ItemActionDialog(
                             selectedId = it.id
                             confirming = false
                         }
-                        if (instances.isEmpty()) Text("Ab diesem Datum gibt es keine Ausführungen.")
+                        if (instances.isEmpty())
+                            Text(text(TextKey.THERE_ARE_NO_OCCURRENCES_FROM_THIS_DATE_ONWARD))
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -309,7 +319,7 @@ internal fun ItemActionDialog(
                                 },
                             ) {
                                 Icon(Icons.Default.ChevronLeft, null)
-                                Text("Zurück")
+                                Text(text(TextKey.BACK))
                             }
                             OutlinedButton(
                                 enabled = !busy && choices.size > TASK_OCCURRENCE_PAGE_SIZE,
@@ -321,19 +331,19 @@ internal fun ItemActionDialog(
                                     confirming = false
                                 },
                             ) {
-                                Text("Weitere")
+                                Text(text(TextKey.MORE_196A0A))
                                 Icon(Icons.Default.ChevronRight, null)
                             }
                         }
                         TextButton(onClick = { showDateJump = !showDateJump }, enabled = !busy) {
                             Text(
-                                if (showDateJump) "Datumssuche schließen"
-                                else "Zu einem anderen Datum …"
+                                if (showDateJump) text(TextKey.CLOSE_DATE_SEARCH)
+                                else text(TextKey.JUMP_TO_ANOTHER_DATE)
                             )
                         }
                         if (showDateJump)
                             DatePickerField(
-                                "Ausführungen anzeigen ab",
+                                text(TextKey.SHOW_OCCURRENCES_FROM),
                                 date,
                                 { chosen ->
                                     chosen?.let {
@@ -355,32 +365,43 @@ internal fun ItemActionDialog(
                         }
                         if (!target.deleting)
                             Text(
-                                "Datum und Uhrzeit kannst du im nächsten Schritt ändern.",
+                                text(TextKey.YOU_CAN_CHANGE_THE_DATE_AND_TIME_IN_THE_NEXT_STEP),
                                 style = MaterialTheme.typography.bodySmall,
                             )
-                        if (selected == null) Text("Es gibt keine sichtbare Ausführung.")
+                        if (selected == null) Text(text(TextKey.THERE_IS_NO_VISIBLE_OCCURRENCE))
                     }
                 }
                 target.appointment?.let { appointment ->
                     Text(
-                        "${formats.fullDate(appointment.details.date)} · ${if (appointment.details.allDay) "Ganztägig" else formats.time(appointment.details.startTime)}"
+                        "${formats.fullDate(appointment.details.date)} · ${if (appointment.details.allDay) text(TextKey.ALL_DAY) else formats.time(appointment.details.startTime)}"
                     )
                     if (scope == OperationScope.FOLLOWING)
                         Text(
-                            "Ab ursprünglichem Termin: ${formats.date(appointment.originalDate)} · ${formats.time(appointment.originTime)}"
+                            text(
+                                TextKey.FROM_ORIGINAL_APPOINTMENT,
+                                formats.date(appointment.originalDate),
+                                formats.time(appointment.originTime),
+                            )
                         )
                 }
                 if (!target.deleting && editBlockReason != null)
                     Text(editBlockReason, color = MaterialTheme.colorScheme.error)
                 if (state.error != null) Text(state.error, color = MaterialTheme.colorScheme.error)
                 else if (state.fromCache)
-                    Text("Zum Speichern ist eine aktuelle Serververbindung erforderlich.")
+                    Text(text(TextKey.SAVING_REQUIRES_A_CURRENT_SERVER_CONNECTION))
                 if (target.deleting)
                     Text(
                         if (confirming)
-                            "${scopeLabel(scope)} löschen? Bestätigungen und Verlauf bleiben erhalten. Ihr könnt die Löschung im Papierkorb rückgängig machen."
+                            text(
+                                TextKey
+                                    .DELETE_CONFIRMATIONS_AND_HISTORY_ARE_PRESERVED_YOU_CAN_UNDO_THE_DELETION,
+                                scopeLabel(scope),
+                            )
                         else
-                            "Auch vergangene oder bestätigte Einträge können aus der Übersicht entfernt werden. Der Verlauf bleibt erhalten."
+                            text(
+                                TextKey
+                                    .PAST_OR_CONFIRMED_ENTRIES_CAN_ALSO_BE_REMOVED_FROM_THE_OVERVIEW_THEIR_HI
+                            )
                     )
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
@@ -445,21 +466,23 @@ internal fun ItemActionDialog(
                 },
             ) {
                 Text(
-                    if (busy) "Speichert …"
-                    else if (!target.deleting) "Weiter"
-                    else if (confirming) "Ja, löschen" else "Löschen …"
+                    if (busy) text(TextKey.SAVING)
+                    else if (!target.deleting) text(TextKey.CONTINUE)
+                    else if (confirming) text(TextKey.YES_DELETE) else text(TextKey.DELETE_F4B324)
                 )
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Abbrechen") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !busy) { Text(text(TextKey.CANCEL)) }
+        },
     )
 }
 
 internal fun scopeLabel(scope: OperationScope): String =
     when (scope) {
-        OperationScope.SINGLE -> "Nur diese Ausführung"
-        OperationScope.FOLLOWING -> "Diese und alle folgenden"
-        OperationScope.ALL -> "Gesamte Reihe"
+        OperationScope.SINGLE -> text(TextKey.ONLY_THIS_OCCURRENCE)
+        OperationScope.FOLLOWING -> text(TextKey.THIS_AND_ALL_FOLLOWING_OCCURRENCES)
+        OperationScope.ALL -> text(TextKey.ENTIRE_SERIES)
     }
 
 @Composable
@@ -478,18 +501,20 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
     ) {
         item {
             Text(
-                "Papierkorb",
+                text(TextKey.TRASH),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
         }
         item {
             Text(
-                "Gelöschte Ausführungen und Reihen. Bestätigungen, Verlauf und Statistiken bleiben erhalten."
+                text(
+                    TextKey.DELETED_OCCURRENCES_AND_SERIES_CONFIRMATIONS_HISTORY_AND_STATISTICS_ARE
+                )
             )
         }
         if (deleted.isEmpty() && state.listItems.none { it.deleted })
-            item { Text("Hier ist noch nichts im Papierkorb.") }
+            item { Text(text(TextKey.THERE_IS_NOTHING_IN_TRASH_YET)) }
         error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         items(deleted, key = { it.id }) { item ->
             Card(
@@ -499,9 +524,8 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(item.title, fontWeight = FontWeight.Bold)
                     Text(
-                        (if (item.type == ItemType.TASK) "Aufgabe" else "Termin") +
-                            " · " +
-                            scopeLabel(item.scope)
+                        (if (item.type == ItemType.TASK) text(TextKey.TASK)
+                        else text(TextKey.APPOINTMENT)) + " · " + scopeLabel(item.scope)
                     )
                     if (item.scope != OperationScope.ALL)
                         Text("${formats.date(item.anchorDate)} · ${formats.time(item.anchorTime)}")
@@ -515,7 +539,7 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
                     ) {
                         Icon(Icons.Default.Restore, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Wiederherstellen")
+                        Text(text(TextKey.RESTORE))
                     }
                 }
             }
@@ -536,7 +560,7 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
                             restoringList = item
                         },
                     ) {
-                        Text("Wiederherstellen")
+                        Text(text(TextKey.RESTORE))
                     }
                 }
             }
@@ -546,10 +570,15 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
     restoringList?.let { item ->
         AlertDialog(
             onDismissRequest = { if (!busy) restoringList = null },
-            title = { Text("Wiederherstellen?") },
+            title = { Text(text(TextKey.RESTORE_ABD462)) },
             text = {
                 Column {
-                    Text("„${item.title}“ wird mit seinem aktuellen Kaufstatus wieder sichtbar.")
+                    Text(
+                        text(
+                            TextKey.BECOMES_VISIBLE_AGAIN_WITH_ITS_CURRENT_PURCHASE_STATUS,
+                            item.title,
+                        )
+                    )
                     listError?.let { Text(it, color = StatusColors.error) }
                 }
             },
@@ -560,12 +589,12 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
                         vm.changeListItem(item, ListAction.RESTORED) { restoringList = null }
                     },
                 ) {
-                    Text("Wiederherstellen")
+                    Text(text(TextKey.RESTORE))
                 }
             },
             dismissButton = {
                 TextButton(enabled = !busy, onClick = { restoringList = null }) {
-                    Text("Abbrechen")
+                    Text(text(TextKey.CANCEL))
                 }
             },
         )
@@ -573,10 +602,14 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
     restoring?.let { deletion ->
         AlertDialog(
             onDismissRequest = { if (!busy) restoring = null },
-            title = { Text("Wiederherstellen?") },
+            title = { Text(text(TextKey.RESTORE_ABD462)) },
             text = {
                 Text(
-                    "„${deletion.title}“ wird nach dem aktuellen Zeitplan wieder sichtbar. Neuere Änderungen und andere Löschungen bleiben bestehen."
+                    text(
+                        TextKey
+                            .BECOMES_VISIBLE_AGAIN_USING_THE_CURRENT_SCHEDULE_NEWER_CHANGES_AND_OTHER,
+                        deletion.title,
+                    )
                 )
             },
             confirmButton = {
@@ -600,15 +633,17 @@ internal fun TrashScreen(state: FamilyState, vm: FamilyViewModel) {
                                 }
                             )
                                 vm.message.value =
-                                    "Wiederhergestellt. Eine weitere Löschung blendet Teile weiterhin aus."
+                                    text(TextKey.RESTORED_ANOTHER_DELETION_STILL_HIDES_SOME_PARTS)
                         }
                     },
                 ) {
-                    Text("Wiederherstellen")
+                    Text(text(TextKey.RESTORE))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { restoring = null }, enabled = !busy) { Text("Abbrechen") }
+                TextButton(onClick = { restoring = null }, enabled = !busy) {
+                    Text(text(TextKey.CANCEL))
+                }
             },
         )
     }

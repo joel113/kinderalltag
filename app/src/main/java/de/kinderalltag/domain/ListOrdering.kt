@@ -1,5 +1,7 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
+
 internal const val MAX_LIST_ORDER_ITEMS = 1000
 
 data class FamilyListOrder(
@@ -8,16 +10,16 @@ data class FamilyListOrder(
     val version: Long = 0,
 ) {
     fun validate() {
-        require(itemIds.size <= MAX_LIST_ORDER_ITEMS) {
-            "Höchstens 1000 Einträge können manuell sortiert werden."
+        requireLocalized(itemIds.size <= MAX_LIST_ORDER_ITEMS) {
+            message(TextKey.UP_TO_1000_ENTRIES_CAN_BE_MANUALLY_SORTED)
         }
-        require(
+        requireLocalized(
             itemIds.distinct().size == itemIds.size &&
                 itemIds.all { it.matches(Regex("[A-Za-z0-9_-]{1,100}")) }
         ) {
-            "Ungültige Reihenfolge. Bitte die Liste neu öffnen."
+            message(TextKey.INVALID_ORDER_PLEASE_REOPEN_THE_LIST)
         }
-        require(version >= 0) { "Ungültige Version der Reihenfolge." }
+        requireLocalized(version >= 0) { message(TextKey.INVALID_ORDER_VERSION) }
     }
 }
 

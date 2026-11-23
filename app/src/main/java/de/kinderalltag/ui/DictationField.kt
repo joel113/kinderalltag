@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import de.kinderalltag.domain.appendDictation
+import de.kinderalltag.text.*
 
 @Composable
 internal fun rememberDictation(
@@ -22,6 +23,8 @@ internal fun rememberDictation(
     onRecognized: (String) -> Unit,
 ): () -> Unit {
     val context = LocalContext.current
+    val speechLanguage =
+        presentationLocale(androidx.compose.ui.platform.LocalConfiguration.current).toLanguageTag()
     val latestChange by rememberUpdatedState(onRecognized)
     val latestEnabled by rememberUpdatedState(enabled)
     val launcher =
@@ -45,21 +48,23 @@ internal fun rememberDictation(
                             RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                             RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
                         )
-                        .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "de-DE")
+                        .putExtra(RecognizerIntent.EXTRA_LANGUAGE, speechLanguage)
                         .putExtra(RecognizerIntent.EXTRA_PROMPT, prompt)
                         .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 )
             } catch (_: ActivityNotFoundException) {
                 Toast.makeText(
                         context,
-                        "Keine Spracherkennung verfügbar. Bitte die Tastatur verwenden.",
+                        text(TextKey.SPEECH_RECOGNITION_UNAVAILABLE_PLEASE_USE_THE_KEYBOARD),
                         Toast.LENGTH_LONG,
                     )
                     .show()
             } catch (_: SecurityException) {
                 Toast.makeText(
                         context,
-                        "Spracherkennung konnte nicht geöffnet werden. Bitte die Tastatur verwenden.",
+                        text(
+                            TextKey.SPEECH_RECOGNITION_COULD_NOT_BE_OPENED_PLEASE_USE_THE_KEYBOARD
+                        ),
                         Toast.LENGTH_LONG,
                     )
                     .show()
@@ -90,7 +95,7 @@ internal fun DictationField(
         minLines = if (notes) 2 else 1,
         trailingIcon = {
             IconButton(enabled = enabled, onClick = dictate) {
-                Icon(Icons.Default.Mic, "$label diktieren")
+                Icon(Icons.Default.Mic, text(TextKey.DICTATE, label))
             }
         },
     )

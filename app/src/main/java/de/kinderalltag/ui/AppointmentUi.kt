@@ -22,6 +22,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.kinderalltag.data.*
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.*
 import java.util.UUID
 
@@ -97,12 +98,15 @@ internal fun AppointmentCard(
                 Icon(Icons.Default.ChevronRight, null, tint = AppTheme.colors.primary)
             }
             Text(
-                if (details.allDay) "Ganztägig"
+                if (details.allDay) text(TextKey.ALL_DAY)
                 else formats.timeRange(details.startTime, details.endTime)
             )
             ItemMetadataIndicators(details.notes, details.location)
             Text(
-                "Zuständig: ${responsibilityName(details.responsibleParentId, state.parents)}",
+                text(
+                    TextKey.ASSIGNED_TO_C1E2EE,
+                    responsibilityName(details.responsibleParentId, state.parents),
+                ),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -151,19 +155,19 @@ internal fun AppointmentAgenda(
         contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (showIntroduction) item { AppBanner("Eure Termine", encouragement) }
+        if (showIntroduction) item { AppBanner(text(TextKey.YOUR_APPOINTMENTS), encouragement) }
         if (showCalendar)
             item {
                 CalendarOverviewCard(
-                    "Termine",
+                    text(TextKey.APPOINTMENTS),
                     calendar,
                     today,
                     calendarPreviews,
-                    "Kommende Termine anzeigen",
+                    text(TextKey.SHOW_UPCOMING_APPOINTMENTS),
                     onCalendarChange,
                 )
             }
-        if (appointments.isEmpty()) item { Text("Keine Termine in diesem Zeitraum.") }
+        if (appointments.isEmpty()) item { Text(text(TextKey.NO_APPOINTMENTS_IN_THIS_PERIOD)) }
         appointments
             .groupBy { it.details.date }
             .forEach { (date, occurrences) ->
@@ -206,14 +210,14 @@ internal fun AppointmentDialogs(
         val details = selected.details
         ItemDetailsDialog(
             details.title,
-            "Termin",
+            text(TextKey.APPOINTMENT),
             { ui.selected = null },
             busy,
             actions = {
                 DetailActions(
                     primary = {
                         DetailAction(
-                            "Im Kalender speichern",
+                            text(TextKey.SAVE_TO_CALENDAR),
                             Icons.Default.EventAvailable,
                             visible && !busy,
                             modifier = Modifier.fillMaxWidth(),
@@ -231,7 +235,7 @@ internal fun AppointmentDialogs(
                             if (future)
                                 add(
                                     DetailActionSpec(
-                                        "Bearbeiten",
+                                        text(TextKey.EDIT),
                                         Icons.Default.Edit,
                                         canManage,
                                         onClick = {
@@ -247,7 +251,7 @@ internal fun AppointmentDialogs(
                                 )
                             add(
                                 DetailActionSpec(
-                                    "Teilen",
+                                    text(TextKey.SHARE),
                                     Icons.Default.Share,
                                     visible && !busy,
                                     onClick = {
@@ -265,7 +269,7 @@ internal fun AppointmentDialogs(
                         },
                     deleteAction =
                         DetailActionSpec(
-                            "Löschen",
+                            text(TextKey.DELETE),
                             Icons.Default.DeleteOutline,
                             canManage,
                             onClick = {
@@ -281,75 +285,88 @@ internal fun AppointmentDialogs(
                 )
             },
         ) {
-            DetailSection("Auf einen Blick") {
+            DetailSection(text(TextKey.AT_A_GLANCE)) {
                 DetailValue(
                     Icons.Default.Face,
-                    "Bereich",
+                    text(TextKey.AREA),
                     appointmentRecipientName(details.recipient, state.sections),
                 )
-                DetailValue(Icons.Default.Event, "Datum", formats.fullDate(details.date))
+                DetailValue(Icons.Default.Event, text(TextKey.DATE), formats.fullDate(details.date))
                 DetailValue(
                     Icons.Default.Schedule,
-                    "Uhrzeit",
-                    if (details.allDay) "Ganztägig"
+                    text(TextKey.TIME),
+                    if (details.allDay) text(TextKey.ALL_DAY)
                     else formats.timeRange(details.startTime, details.endTime),
                 )
                 DetailValue(
                     Icons.Default.Person,
-                    "Zuständig",
+                    text(TextKey.ASSIGNED_TO),
                     responsibilityName(details.responsibleParentId, state.parents),
                 )
                 DetailValue(
                     Icons.Default.Repeat,
-                    "Wiederholung",
-                    if (selected.series.repeat == AppointmentRepeat.ONCE) "Einmalig"
-                    else "Alle ${selected.series.interval} ${repeatLabel(selected.series.repeat)}",
+                    text(TextKey.RECURRENCE),
+                    if (selected.series.repeat == AppointmentRepeat.ONCE) text(TextKey.ONE_OFF)
+                    else
+                        text(
+                            TextKey.EVERY,
+                            selected.series.interval,
+                            repeatLabel(selected.series.repeat),
+                        ),
                 )
                 DetailValue(
                     Icons.Default.Notifications,
-                    "Erinnerung",
+                    text(TextKey.REMINDER),
                     reminderLabel(details.reminderMinutes, details.allDay, formats),
                 )
                 if (details.location.isNotBlank())
-                    DetailValue(Icons.Default.Place, "Ort", details.location)
+                    DetailValue(Icons.Default.Place, text(TextKey.LOCATION), details.location)
             }
             if (details.notes.isNotBlank())
-                DetailSection("Notizen", AppTheme.colors.background) { Text(details.notes) }
+                DetailSection(text(TextKey.NOTES), AppTheme.colors.background) {
+                    Text(details.notes)
+                }
             Text(
-                "Im Kalender speichern öffnet deine Kalender-App zur Bestätigung. Übernommen wird nur dieser Termin als unabhängige Kopie; spätere Änderungen werden nicht automatisch abgeglichen.",
+                text(
+                    TextKey.SAVE_TO_CALENDAR_OPENS_YOUR_CALENDAR_APP_FOR_CONFIRMATION_ONLY_THIS_APPO
+                ),
                 style = MaterialTheme.typography.bodySmall,
             )
             if (future && allowFollowing)
-                DetailSection("Änderung gilt für", AppTheme.colors.background) {
+                DetailSection(text(TextKey.APPLY_CHANGE_TO), AppTheme.colors.background) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             !following,
                             { following = false },
-                            label = { Text("Nur diesen Termin") },
+                            label = { Text(text(TextKey.ONLY_THIS_APPOINTMENT)) },
                         )
                         FilterChip(
                             following,
                             { following = true },
-                            label = { Text("Diesen und folgende") },
+                            label = { Text(text(TextKey.THIS_AND_FOLLOWING_APPOINTMENTS)) },
                         )
                     }
                     Text(
-                        "Wähle den Umfang, bevor du auf Bearbeiten tippst.",
+                        text(TextKey.SELECT_THE_SCOPE_BEFORE_TAPPING_EDIT),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
             if (!future)
                 DetailNotice(
-                    "Dieser Termin hat bereits begonnen. Bearbeiten ist nicht mehr möglich; Löschen bleibt verfügbar."
+                    text(
+                        TextKey
+                            .THIS_APPOINTMENT_HAS_ALREADY_STARTED_EDITING_IS_NO_LONGER_POSSIBLE_DELET
+                    )
                 )
             if (!visible)
                 DetailNotice(
-                    "Dieser Termin wurde geändert, gelöscht oder verschoben. Bitte schließen und die Übersicht neu öffnen."
+                    text(
+                        TextKey
+                            .THIS_APPOINTMENT_HAS_CHANGED_BEEN_DELETED_OR_MOVED_PLEASE_CLOSE_AND_REOP
+                    )
                 )
             if (state.fromCache)
-                DetailNotice(
-                    "Gespeicherter Stand. Zum Bearbeiten oder Löschen ist eine Verbindung erforderlich."
-                )
+                DetailNotice(text(TextKey.SAVED_DATA_EDITING_OR_DELETING_REQUIRES_A_CONNECTION))
             saveError?.let { DetailNotice(it) }
         }
     }
@@ -388,21 +405,21 @@ internal fun AppointmentDialogs(
 
 internal fun repeatLabel(repeat: AppointmentRepeat): String =
     when (repeat) {
-        AppointmentRepeat.ONCE -> "Einmalig"
-        AppointmentRepeat.DAYS -> "Tage"
-        AppointmentRepeat.WEEKS -> "Wochen"
-        AppointmentRepeat.MONTHS -> "Monate"
-        AppointmentRepeat.YEARS -> "Jahre"
+        AppointmentRepeat.ONCE -> text(TextKey.ONE_OFF)
+        AppointmentRepeat.DAYS -> text(TextKey.DAYS_E94F59)
+        AppointmentRepeat.WEEKS -> text(TextKey.WEEKS)
+        AppointmentRepeat.MONTHS -> text(TextKey.MONTHS)
+        AppointmentRepeat.YEARS -> text(TextKey.YEARS)
     }
 
 private fun reminderLabel(minutes: Int?, allDay: Boolean, formats: DateTimeFormats): String =
     when {
-        minutes == null -> "Keine"
-        allDay && minutes == 0 -> "Am selben Tag um ${formats.time(LocalTime.of(9, 0))}"
-        allDay -> "Am Vortag um ${formats.time(LocalTime.of(9, 0))}"
-        minutes == 0 -> "Bei Beginn"
-        minutes == 1440 -> "1 Tag vorher"
-        else -> "$minutes Minuten vorher"
+        minutes == null -> text(TextKey.NONE)
+        allDay && minutes == 0 -> text(TextKey.THE_SAME_DAY_AT, formats.time(LocalTime.of(9, 0)))
+        allDay -> text(TextKey.THE_DAY_BEFORE_AT, formats.time(LocalTime.of(9, 0)))
+        minutes == 0 -> text(TextKey.AT_START)
+        minutes == 1440 -> text(TextKey.VALUE_1_DAY_BEFORE)
+        else -> text(TextKey.MINUTES_BEFORE, minutes)
     }
 
 @Composable
@@ -473,13 +490,14 @@ private fun AppointmentEditor(
                 TopAppBar(
                     title = {
                         Text(
-                            if (target.imported != null) "Termin übernehmen"
-                            else if (seed == null) "Neuer Termin" else "Termin bearbeiten"
+                            if (target.imported != null) text(TextKey.IMPORT_APPOINTMENT)
+                            else if (seed == null) text(TextKey.NEW_APPOINTMENT)
+                            else text(TextKey.EDIT_APPOINTMENT)
                         )
                     },
                     navigationIcon = {
                         IconButton(onClick = onDismiss, enabled = !busy) {
-                            Icon(Icons.Default.Close, "Schließen")
+                            Icon(Icons.Default.Close, text(TextKey.CLOSE))
                         }
                     },
                 )
@@ -490,7 +508,10 @@ private fun AppointmentEditor(
                     if (target.imported != null) {
                         item {
                             Text(
-                                "Bitte Datum, Zuordnung, Zuständigkeit und Wiederholung prüfen. Erst Speichern übernimmt den Termin in euren Haushalt."
+                                text(
+                                    TextKey
+                                        .PLEASE_CHECK_THE_DATE_RECIPIENT_ASSIGNMENT_AND_RECURRENCE_ONLY_SAVE_ADDS
+                                )
                             )
                         }
                         target.imported.warnings.forEach { warning ->
@@ -505,7 +526,7 @@ private fun AppointmentEditor(
                                         enabled = !busy,
                                     )
                                     Text(
-                                        "Ich habe die Importhinweise geprüft.",
+                                        text(TextKey.I_HAVE_CHECKED_THE_IMPORT_NOTES),
                                         Modifier.weight(1f),
                                     )
                                 }
@@ -513,7 +534,7 @@ private fun AppointmentEditor(
                         if (duplicateImport)
                             item {
                                 Text(
-                                    "Ein ähnlicher Termin ist bereits vorhanden.",
+                                    text(TextKey.A_SIMILAR_APPOINTMENT_ALREADY_EXISTS),
                                     color = MaterialTheme.colorScheme.error,
                                 )
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -523,7 +544,7 @@ private fun AppointmentEditor(
                                         enabled = !busy,
                                     )
                                     Text(
-                                        "Trotzdem eine weitere Kopie anlegen.",
+                                        text(TextKey.CREATE_ANOTHER_COPY_ANYWAY),
                                         Modifier.weight(1f),
                                     )
                                 }
@@ -533,12 +554,12 @@ private fun AppointmentEditor(
                         DictationField(
                             title,
                             { title = it },
-                            "Titel",
+                            text(TextKey.TITLE),
                             Modifier.fillMaxWidth(),
                             enabled = !busy,
                         )
                     }
-                    item { Text("Für welchen Bereich?", fontWeight = FontWeight.Bold) }
+                    item { Text(text(TextKey.WHICH_AREA), fontWeight = FontWeight.Bold) }
                     item {
                         Row(
                             Modifier.horizontalScroll(rememberScrollState()),
@@ -558,7 +579,7 @@ private fun AppointmentEditor(
                     item { AssignmentPicker(state.parents, parent) { parent = it } }
                     item {
                         DatePickerField(
-                            "Datum",
+                            text(TextKey.DATE),
                             date,
                             { it?.let { chosen -> date = chosen } },
                             enabled = !busy,
@@ -569,7 +590,7 @@ private fun AppointmentEditor(
                     }
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Ganztägig", Modifier.weight(1f))
+                            Text(text(TextKey.ALL_DAY), Modifier.weight(1f))
                             Switch(
                                 allDay,
                                 {
@@ -580,10 +601,17 @@ private fun AppointmentEditor(
                         }
                     }
                     if (!allDay) {
-                        item { TimePickerField("Beginn", start, { start = it }, enabled = !busy) }
                         item {
                             TimePickerField(
-                                "Ende (gleicher Tag)",
+                                text(TextKey.START),
+                                start,
+                                { start = it },
+                                enabled = !busy,
+                            )
+                        }
+                        item {
+                            TimePickerField(
+                                text(TextKey.END_SAME_DAY),
                                 end,
                                 { end = it },
                                 enabled = !busy,
@@ -594,7 +622,7 @@ private fun AppointmentEditor(
                         OutlinedTextField(
                             location,
                             { location = it },
-                            label = { Text("Ort (optional)") },
+                            label = { Text(text(TextKey.LOCATION_OPTIONAL)) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -602,7 +630,7 @@ private fun AppointmentEditor(
                         DictationField(
                             notes,
                             { notes = it },
-                            "Notizen (optional)",
+                            text(TextKey.NOTES_OPTIONAL),
                             Modifier.fillMaxWidth(),
                             notes = true,
                             enabled = !busy,
@@ -612,10 +640,13 @@ private fun AppointmentEditor(
                         if (target.following)
                             item {
                                 Text(
-                                    "Bei unverändertem Datum und Intervall bleibt der ursprüngliche Rhythmus erhalten."
+                                    text(
+                                        TextKey
+                                            .KEEPING_THE_DATE_AND_INTERVAL_PRESERVES_THE_ORIGINAL_RHYTHM
+                                    )
                                 )
                             }
-                        item { Text("Wiederholung", fontWeight = FontWeight.Bold) }
+                        item { Text(text(TextKey.RECURRENCE), fontWeight = FontWeight.Bold) }
                         item {
                             Row(
                                 Modifier.horizontalScroll(rememberScrollState()),
@@ -636,14 +667,16 @@ private fun AppointmentEditor(
                                     interval,
                                     { interval = it },
                                     label = {
-                                        Text("Alle wie viele ${repeatLabel(repeat)}? (1–1000)")
+                                        Text(
+                                            text(TextKey.EVERY_HOW_MANY_11000, repeatLabel(repeat))
+                                        )
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                             item {
                                 DatePickerField(
-                                    "Bis einschließlich (optional)",
+                                    text(TextKey.UNTIL_INCLUSIVE_OPTIONAL),
                                     until,
                                     { until = it },
                                     optional = true,
@@ -653,7 +686,7 @@ private fun AppointmentEditor(
                             }
                         }
                     }
-                    item { Text("Erinnerung", fontWeight = FontWeight.Bold) }
+                    item { Text(text(TextKey.REMINDER), fontWeight = FontWeight.Bold) }
                     item {
                         Column {
                             val options =
@@ -674,11 +707,11 @@ private fun AppointmentEditor(
                         item {
                             Text(state.error, color = MaterialTheme.colorScheme.error)
                             TextButton(onClick = onRetrySync, enabled = !busy) {
-                                Text("Erneut versuchen")
+                                Text(text(TextKey.TRY_AGAIN))
                             }
                         }
                     else if (state.fromCache)
-                        item { Text("Zum Speichern ist eine Verbindung erforderlich.") }
+                        item { Text(text(TextKey.SAVING_REQUIRES_A_CONNECTION)) }
                     item {
                         Button(
                             enabled =
@@ -702,8 +735,8 @@ private fun AppointmentEditor(
                                             notes.trim(),
                                             reminder,
                                         )
-                                    require(details.startInstant > Instant.now()) {
-                                        "Der Termin muss in der Zukunft liegen."
+                                    requireLocalized(details.startInstant > Instant.now()) {
+                                        message(TextKey.THE_APPOINTMENT_MUST_BE_IN_THE_FUTURE)
                                     }
                                     val count =
                                         if (repeat == AppointmentRepeat.ONCE) 1
@@ -737,12 +770,14 @@ private fun AppointmentEditor(
                                 } catch (e: Exception) {
                                     error =
                                         if (e is NumberFormatException)
-                                            "Bitte das Intervall als ganze Zahl eingeben."
-                                        else e.message ?: "Bitte Angaben prüfen."
+                                            text(
+                                                TextKey.PLEASE_ENTER_THE_INTERVAL_AS_A_WHOLE_NUMBER
+                                            )
+                                        else e.message ?: text(TextKey.PLEASE_CHECK_YOUR_ENTRIES)
                                 }
                             },
                         ) {
-                            Text(if (busy) "Speichert …" else "Termin speichern")
+                            Text(if (busy) text(TextKey.SAVING) else text(TextKey.SAVE_APPOINTMENT))
                         }
                     }
                 }
@@ -751,10 +786,13 @@ private fun AppointmentEditor(
         confirmDraft?.let { draft ->
             AlertDialog(
                 onDismissRequest = { confirmDraft = null },
-                title = { Text("Zukünftige Termine ersetzen?") },
+                title = { Text(text(TextKey.REPLACE_FUTURE_APPOINTMENTS)) },
                 text = {
                     Text(
-                        "Dieser und alle folgenden Termine werden ersetzt. Begonnene Termine und einzelne Ausnahmen bleiben erhalten. Löschungen werden nicht rückgängig gemacht."
+                        text(
+                            TextKey
+                                .THIS_AND_ALL_FOLLOWING_APPOINTMENTS_WILL_BE_REPLACED_STARTED_APPOINTMENT
+                        )
                     )
                 },
                 confirmButton = {
@@ -764,11 +802,11 @@ private fun AppointmentEditor(
                             onSave(draft)
                         }
                     ) {
-                        Text("Ersetzen")
+                        Text(text(TextKey.REPLACE))
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { confirmDraft = null }) { Text("Abbrechen") }
+                    TextButton(onClick = { confirmDraft = null }) { Text(text(TextKey.CANCEL)) }
                 },
             )
         }

@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import de.kinderalltag.text.*
 import java.time.LocalDate
 
 @Composable
@@ -20,15 +21,15 @@ internal fun PeriodNavigationCard(today: LocalDate, page: Long, onPageChange: (L
     val from = today.plusDays(page * 90)
     val to = from.plusDays(89)
     PageNavigationCard(
-        "90 Tage",
+        text(TextKey.VALUE_90_DAYS),
         "${formats.date(from)} – ${formats.date(to)}",
         page > 0,
         true,
         onPrevious = { onPageChange(page - 1) },
         onNext = { onPageChange(page + 1) },
-        previousDescription = "Vorherige 90 Tage",
-        nextDescription = "Nächste 90 Tage",
-        resetText = if (page > 0) "Ab heute anzeigen" else null,
+        previousDescription = text(TextKey.PREVIOUS_90_DAYS),
+        nextDescription = text(TextKey.NEXT_90_DAYS),
+        resetText = if (page > 0) text(TextKey.SHOW_FROM_TODAY) else null,
         onReset = { onPageChange(0) },
     )
 }

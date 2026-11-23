@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.kinderalltag.data.*
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.delay
@@ -20,6 +21,21 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
 
     val state = repository.state
     val message = MutableStateFlow<String?>(null)
+
+    fun refreshPresentation() {
+        repository.refreshPresentation()
+        clearTransientMessages()
+    }
+
+    fun clearTransientMessages() {
+        message.value = null
+        appointmentError.value = null
+        taskError.value = null
+        careError.value = null
+        operationError.value = null
+        listError.value = null
+    }
+
     val busy = MutableStateFlow(false)
     val appointmentError = MutableStateFlow<String?>(null)
     val taskError = MutableStateFlow<String?>(null)
@@ -67,7 +83,7 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
             } catch (e: Exception) {
                 taskError.value =
                     if (e is IllegalArgumentException) e.message
-                    else "Speichern fehlgeschlagen. Bitte Verbindung und Familienzugang prüfen."
+                    else text(TextKey.SAVING_FAILED_PLEASE_CHECK_YOUR_CONNECTION_AND_FAMILY_ACCESS)
                 message.value = taskError.value
             } finally {
                 busy.value = false
@@ -92,7 +108,10 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
                             it is IllegalArgumentException || it is IllegalStateException
                         }
                         ?.message
-                        ?: "Änderung konnte nicht gespeichert werden. Bitte Verbindung und Zugangsregeln prüfen."
+                        ?: text(
+                            TextKey
+                                .THE_CHANGE_COULD_NOT_BE_SAVED_PLEASE_CHECK_YOUR_CONNECTION_AND_ACCESS_RU
+                        )
                 message.value = operationError.value
             } finally {
                 busy.value = false
@@ -124,7 +143,7 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
                 Schedule.activeCompletions(state.value.events, it.id).isEmpty()
             }
         if (occurrence == null) {
-            message.value = "Keine kommende, unbestätigte Ausführung gefunden."
+            message.value = text(TextKey.NO_UPCOMING_UNCONFIRMED_OCCURRENCE_FOUND)
             return
         }
         val draft =
@@ -146,7 +165,10 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
                 done()
             } catch (_: Exception) {
                 message.value =
-                    "Kinderprofil konnte nicht gespeichert werden. Verbindung und Zugangsregeln prüfen."
+                    text(
+                        TextKey
+                            .THE_CHILD_PROFILE_COULD_NOT_BE_SAVED_CHECK_YOUR_CONNECTION_AND_ACCESS_RU
+                    )
             } finally {
                 busy.value = false
             }
@@ -204,7 +226,10 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
                 appointmentError.value =
                     if (e is IllegalArgumentException || e is IllegalStateException) e.message
                     else
-                        "Termin konnte nicht gespeichert werden. Verbindung und Zugangsregeln prüfen."
+                        text(
+                            TextKey
+                                .THE_APPOINTMENT_COULD_NOT_BE_SAVED_CHECK_YOUR_CONNECTION_AND_ACCESS_RULE
+                        )
             } finally {
                 busy.value = false
             }
@@ -259,9 +284,9 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
                 message.value = it
             }
             done()
-            message.value = "${drafts.size} Einkäufe zur Synchronisierung vorgemerkt."
+            message.value = quantity(QuantityKey.IMPORT_QUEUED, drafts.size, drafts.size)
         } catch (e: Exception) {
-            listError.value = e.message ?: "Einkäufe konnten nicht übernommen werden."
+            listError.value = e.message ?: text(TextKey.SHOPPING_ITEMS_COULD_NOT_BE_ADDED)
         }
     }
 
@@ -273,7 +298,7 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
                 message.value = it
             }
         } catch (e: Exception) {
-            listError.value = e.message ?: "Kaufstatus konnte nicht geändert werden."
+            listError.value = e.message ?: text(TextKey.THE_PURCHASE_STATUS_COULD_NOT_BE_CHANGED)
             message.value = listError.value
         }
     }
@@ -299,7 +324,10 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
                             it is IllegalArgumentException || it is IllegalStateException
                         }
                         ?.message
-                        ?: "Reihenfolge konnte nicht gespeichert werden. Bitte Verbindung und Regeln prüfen."
+                        ?: text(
+                            TextKey
+                                .THE_ORDER_COULD_NOT_BE_SAVED_PLEASE_CHECK_YOUR_CONNECTION_AND_RULES
+                        )
                 message.value = listError.value
                 done(false)
             } finally {
@@ -334,7 +362,8 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
                         .firstOrNull {
                             it is IllegalArgumentException || it is IllegalStateException
                         }
-                        ?.message ?: "Änderung fehlgeschlagen. Bitte Verbindung und Regeln prüfen."
+                        ?.message
+                        ?: text(TextKey.THE_CHANGE_FAILED_PLEASE_CHECK_YOUR_CONNECTION_AND_RULES)
                 message.value = listError.value
             } finally {
                 busy.value = false

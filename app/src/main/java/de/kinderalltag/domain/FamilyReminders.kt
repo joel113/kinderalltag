@@ -1,5 +1,6 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
 import java.time.Instant
 
 fun appointmentRecipientName(recipient: AppointmentRecipient, sections: List<Child>): String =
@@ -7,8 +8,8 @@ fun appointmentRecipientName(recipient: AppointmentRecipient, sections: List<Chi
         AppointmentRecipient.FERDINAND ->
             sections.firstOrNull { it.id == "ferdinand" }?.name ?: "Ferdinand"
         AppointmentRecipient.JOHANN -> sections.firstOrNull { it.id == "johann" }?.name ?: "Johann"
-        AppointmentRecipient.BOTH_CHILDREN -> "Beide Kinder"
-        AppointmentRecipient.HOUSEHOLD -> "Haushalt"
+        AppointmentRecipient.BOTH_CHILDREN -> text(TextKey.BOTH_CHILDREN)
+        AppointmentRecipient.HOUSEHOLD -> text(TextKey.HOUSEHOLD)
     }
 
 data class FamilyReminder(
@@ -19,6 +20,10 @@ data class FamilyReminder(
     val expiresAt: Instant,
     val kind: String,
     val fingerprint: String = "",
+    val itemTitle: String = title,
+    val subjectId: String? = null,
+    val recipient: AppointmentRecipient? = null,
+    val subjectName: String? = null,
 )
 
 fun AppointmentOccurrence.reminderFingerprint(): String = details.toString()
@@ -74,10 +79,14 @@ object FamilyReminders {
                     FamilyReminder(
                         it.id,
                         it.date.toString(),
-                        "${sections.firstOrNull { child -> child.id == it.revision.childId }?.name ?: "Bereich"}: ${it.revision.title}",
+                        "${sections.firstOrNull { child -> child.id == it.revision.childId }?.name ?: text(TextKey.AREA)}: ${it.revision.title}",
                         it.instant,
                         it.date.plusDays(1).atStartOfDay(FAMILY_ZONE).toInstant(),
                         "task",
+                        itemTitle = it.revision.title,
+                        subjectId = it.revision.childId,
+                        subjectName =
+                            sections.firstOrNull { child -> child.id == it.revision.childId }?.name,
                     )
                 }
         val appointmentsDue =
@@ -106,6 +115,9 @@ object FamilyReminders {
                         it.details.endInstant,
                         "appointment",
                         it.reminderFingerprint(),
+                        itemTitle = it.details.title,
+                        recipient = it.details.recipient,
+                        subjectName = appointmentRecipientName(it.details.recipient, sections),
                     )
                 }
         return (tasks + appointmentsDue)
@@ -113,4 +125,20 @@ object FamilyReminders {
             .sortedWith(compareBy<FamilyReminder> { it.at }.thenBy { it.id })
             .take(limit)
     }
+}
+
+fun reminderDisplayTitle(
+    title: String,
+    subjectId: String?,
+    recipient: AppointmentRecipient?,
+    subjectName: String?,
+): String {
+    val subject =
+        when {
+            subjectId == "haushalt" || recipient == AppointmentRecipient.HOUSEHOLD ->
+                text(TextKey.HOUSEHOLD)
+            recipient == AppointmentRecipient.BOTH_CHILDREN -> text(TextKey.BOTH_CHILDREN)
+            else -> subjectName?.takeIf { it.isNotBlank() } ?: text(TextKey.AREA)
+        }
+    return "$subject: $title"
 }

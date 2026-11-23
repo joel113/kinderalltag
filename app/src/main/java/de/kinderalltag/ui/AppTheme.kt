@@ -7,16 +7,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import de.kinderalltag.text.*
 
-internal enum class AppThemeId(val storedValue: String, val label: String) {
-    GARDEN("garden", "Garten"),
-    PLAY("play", "Spielwelt"),
-    SPACE("space", "Weltraum"),
-    ANIMALS("animals", "Tierwelt"),
-    VEHICLES("vehicles", "Fahrzeugwelt"),
-    NATURE("nature", "Naturwelt"),
-    FARM("farm", "Bauernhof"),
-    MAGIC("magic", "Magische Welt");
+internal enum class AppThemeId(val storedValue: String, private val labelKey: TextKey) {
+    GARDEN("garden", TextKey.GARDEN),
+    PLAY("play", TextKey.PLAY_WORLD),
+    SPACE("space", TextKey.SPACE),
+    ANIMALS("animals", TextKey.ANIMAL_WORLD),
+    VEHICLES("vehicles", TextKey.VEHICLE_WORLD),
+    NATURE("nature", TextKey.NATURE_WORLD),
+    FARM("farm", TextKey.FARM),
+    MAGIC("magic", TextKey.MAGICAL_WORLD);
+
+    val label: String
+        get() = text(labelKey)
 
     companion object {
         fun fromStored(value: String?): AppThemeId =
@@ -85,8 +89,11 @@ internal data class AppPalette(
 internal data class AppThemeDefinition(
     val id: AppThemeId,
     val colors: AppPalette,
-    val settingsTitle: String,
-)
+    private val settingsTitleKey: TextKey,
+) {
+    val settingsTitle: String
+        get() = text(settingsTitleKey)
+}
 
 internal object AppThemes {
     val garden =
@@ -111,7 +118,7 @@ internal object AppThemes {
                 Color(0xFFBF4658),
                 Color(0xFF79A78B),
             ),
-            "Euer Familiengarten",
+            TextKey.YOUR_FAMILY_GARDEN,
         )
     val play =
         AppThemeDefinition(
@@ -135,7 +142,7 @@ internal object AppThemes {
                 Color(0xFFD99580),
                 Color(0xFFA4B889),
             ),
-            "Eure Spielwelt",
+            TextKey.YOUR_PLAY_WORLD,
         )
     val space =
         AppThemeDefinition(
@@ -159,7 +166,7 @@ internal object AppThemes {
                 Color(0xFFD69AAB),
                 Color(0xFFA1B7CB),
             ),
-            "Eure Raumstation",
+            TextKey.YOUR_SPACE_STATION,
         )
 
     val animals =
@@ -184,7 +191,7 @@ internal object AppThemes {
                 artCoral = Color(0xFFF0A65A),
                 artGreen = Color(0xFFB0C67F),
             ),
-            "Eure Tierwelt",
+            TextKey.YOUR_ANIMAL_WORLD,
         )
 
     val vehicles =
@@ -209,7 +216,7 @@ internal object AppThemes {
                 artCoral = Color(0xFFE0A25E),
                 artGreen = Color(0xFF92B76D),
             ),
-            "Eure Fahrzeugwelt",
+            TextKey.YOUR_VEHICLE_WORLD,
         )
 
     val nature =
@@ -234,7 +241,7 @@ internal object AppThemes {
                 artCoral = Color(0xFFE7A2B5),
                 artGreen = Color(0xFF88B98A),
             ),
-            "Eure Naturwelt",
+            TextKey.YOUR_NATURE_WORLD,
         )
 
     val farm =
@@ -259,7 +266,7 @@ internal object AppThemes {
                 artCoral = Color(0xFFE5A0A1),
                 artGreen = Color(0xFF9FBA73),
             ),
-            "Euer Bauernhof",
+            TextKey.YOUR_FARM,
         )
 
     val magic =
@@ -284,7 +291,7 @@ internal object AppThemes {
                 artCoral = Color(0xFFEDA9CA),
                 artGreen = Color(0xFF96CDBB),
             ),
-            "Eure magische Welt",
+            TextKey.YOUR_MAGICAL_WORLD,
         )
 
     fun get(id: AppThemeId): AppThemeDefinition =
@@ -330,7 +337,7 @@ internal fun AppThemeHost(content: @Composable () -> Unit) {
             if (!LauncherIcons.sync(context, it)) {
                 Toast.makeText(
                         context,
-                        "Das App-Symbol konnte noch nicht aktualisiert werden. Bitte öffne die App erneut.",
+                        text(TextKey.THE_APP_ICON_COULD_NOT_BE_UPDATED_YET_PLEASE_REOPEN_THE_APP),
                         Toast.LENGTH_LONG,
                     )
                     .show()

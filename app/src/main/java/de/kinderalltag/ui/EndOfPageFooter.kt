@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import de.kinderalltag.text.*
 
 @Composable
 internal fun EndOfPageFooter(motif: IllustrationRole, modifier: Modifier = Modifier) {
@@ -26,14 +27,14 @@ internal fun EndOfPageFooter(motif: IllustrationRole, modifier: Modifier = Modif
             AppIllustration(motif, Modifier.padding(12.dp).size(56.dp))
         }
         Text(
-            "Du bist am Ende angekommen.",
+            text(TextKey.YOU_VE_REACHED_THE_END),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = AppTheme.colors.ink,
             textAlign = TextAlign.Center,
         )
         Text(
-            "Ein kleiner Moment zum Durchatmen.",
+            text(TextKey.A_LITTLE_MOMENT_TO_TAKE_A_BREATH),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

@@ -3,6 +3,7 @@ package de.kinderalltag.data
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.*
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.util.UUID
 import kotlinx.coroutines.tasks.await
 
@@ -79,20 +80,25 @@ class FamilyLists(
     suspend fun reorder(kind: FamilyListKind, itemIds: List<String>, expectedVersion: Long) {
         val user = requireNotNull(auth.currentUser)
         val current = state()
-        require(current.loaded && !current.fromCache && !current.pending && current.error == null) {
-            "Zum Sortieren ist eine aktuelle Serververbindung erforderlich."
+        requireLocalized(
+            current.loaded && !current.fromCache && !current.pending && current.error == null
+        ) {
+            message(TextKey.SORTING_REQUIRES_A_CURRENT_SERVER_CONNECTION)
         }
         FamilyListOrder(kind, itemIds, expectedVersion).validate()
-        require(
+        requireLocalized(
             itemIds.toSet() == current.listItems.filter { it.kind == kind }.map { it.id }.toSet()
         ) {
-            "Die Liste wurde inzwischen geändert. Bitte erneut verschieben."
+            message(TextKey.THE_LIST_HAS_CHANGED_PLEASE_TRY_MOVING_THE_ITEM_AGAIN)
         }
         db.runTransaction { transaction ->
                 val ref = household.collection("listOrders").document(kind.name)
                 val saved = transaction.get(ref)
                 require((saved.getLong("version") ?: 0L) == expectedVersion) {
-                    "Die Reihenfolge wurde auf dem anderen Gerät geändert. Bitte erneut verschieben."
+                    text(
+                        TextKey
+                            .THE_ORDER_CHANGED_ON_THE_OTHER_DEVICE_PLEASE_TRY_MOVING_THE_ITEM_AGAIN
+                    )
                 }
                 transaction.set(
                     ref,
@@ -127,7 +133,7 @@ class FamilyLists(
                     .sortedBy { it.id }
                     .map { it.labelMap() },
             "authorId" to user.uid,
-            "authorName" to (user.displayName ?: "Elternteil").take(120),
+            "authorName" to (user.displayName ?: text(TextKey.PARENT)).take(120),
             "clientMillis" to System.currentTimeMillis(),
             "createdAt" to FieldValue.serverTimestamp(),
             "targetId" to target,
@@ -138,12 +144,12 @@ class FamilyLists(
         item.validate()
         item.labelIds.forEach { id ->
             val label = state().listLabels.firstOrNull { it.id == id }
-            require(
+            requireLocalized(
                 label != null &&
                     if (item.kind == FamilyListKind.SHOPPING) label.group == LabelGroup.SHOPPING
                     else label.group != LabelGroup.SHOPPING
             ) {
-                "Label nicht verfügbar. Bitte neu laden."
+                message(TextKey.LABEL_UNAVAILABLE_PLEASE_RELOAD)
             }
         }
     }
@@ -161,7 +167,7 @@ class FamilyLists(
         )
         batch.commit().addOnFailureListener {
             onError(
-                "Eintrag konnte nicht synchronisiert werden. Bitte Familienzugang und Regeln prüfen."
+                text(TextKey.THE_ENTRY_COULD_NOT_SYNCHRONIZE_PLEASE_CHECK_FAMILY_ACCESS_AND_RULES)
             )
         }
     }
@@ -175,7 +181,10 @@ class FamilyLists(
         drafts.forEach {
             create(it) {
                 onError(
-                    "Einige Einkäufe konnten nicht synchronisiert werden. Bitte die Liste und den Familienzugang prüfen."
+                    text(
+                        TextKey
+                            .SOME_SHOPPING_ITEMS_COULD_NOT_SYNCHRONIZE_PLEASE_CHECK_THE_LIST_AND_FAMI
+                    )
                 )
             }
         }
@@ -200,7 +209,7 @@ class FamilyLists(
             )
         }
         batch.commit().addOnFailureListener {
-            onError("Kaufstatus konnte nicht synchronisiert werden. Bitte erneut versuchen.")
+            onError(text(TextKey.THE_PURCHASE_STATUS_COULD_NOT_SYNCHRONIZE_PLEASE_TRY_AGAIN))
         }
     }
 
@@ -214,11 +223,11 @@ class FamilyLists(
                 check(tx.get(household.collection("members").document(user.uid)).exists())
                 val ref = household.collection("listItems").document(draft.id)
                 val old = decodeListItem(requireNotNull(tx.get(ref).data))
-                check(old.version == draft.version && old.kind == draft.kind) {
-                    "Dieser Eintrag wurde geändert. Bitte schließen und neu öffnen."
+                checkLocalized(old.version == draft.version && old.kind == draft.kind) {
+                    message(TextKey.THIS_ENTRY_HAS_CHANGED_PLEASE_CLOSE_AND_REOPEN_IT_2192A4)
                 }
-                require(if (action == ListAction.RESTORED) old.deleted else !old.deleted) {
-                    "Dieser Eintrag wurde bereits geändert."
+                requireLocalized(if (action == ListAction.RESTORED) old.deleted else !old.deleted) {
+                    message(TextKey.THIS_ENTRY_HAS_ALREADY_CHANGED)
                 }
                 val updated =
                     (if (action == ListAction.CHANGED) draft else old).copy(
@@ -236,8 +245,10 @@ class FamilyLists(
     }
 
     private fun requireOnline() {
-        require(state().loaded && !state().fromCache && !state().pending && state().error == null) {
-            "Für diese Änderung ist eine aktuelle Serververbindung erforderlich."
+        requireLocalized(
+            state().loaded && !state().fromCache && !state().pending && state().error == null
+        ) {
+            message(TextKey.THIS_CHANGE_REQUIRES_A_CURRENT_SERVER_CONNECTION)
         }
     }
 
@@ -249,8 +260,10 @@ class FamilyLists(
                 check(tx.get(household.collection("members").document(uid)).exists())
                 val ref = household.collection("listLabels").document(label.id)
                 val old = tx.get(ref)
-                check(if (creating) !old.exists() else old.getLong("version") == label.version) {
-                    "Dieses Label wurde geändert. Bitte neu öffnen."
+                checkLocalized(
+                    if (creating) !old.exists() else old.getLong("version") == label.version
+                ) {
+                    message(TextKey.THIS_LABEL_HAS_CHANGED_PLEASE_REOPEN_IT)
                 }
                 tx.set(ref, label.copy(version = if (creating) 0 else label.version + 1).labelMap())
             }

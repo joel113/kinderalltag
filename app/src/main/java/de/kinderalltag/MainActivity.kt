@@ -4,9 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,14 +23,18 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import de.kinderalltag.text.*
 import de.kinderalltag.ui.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppStrings.activityCreated()
+        de.kinderalltag.notifications.ReminderScheduler.createChannel(this)
+        de.kinderalltag.notifications.ActivityNotifications.createChannel(this)
         enableEdgeToEdge()
         if (savedInstanceState == null) receiveCalendar(intent)
         setContent {
@@ -62,7 +66,7 @@ class MainActivity : ComponentActivity() {
                             scope.launch {
                                 signingIn = true
                                 loginError = null
-                                var stage = "Konfiguration"
+                                var stage = text(TextKey.CONFIGURATION)
                                 try {
                                     val clientIdResource =
                                         resources.getIdentifier(
@@ -71,14 +75,17 @@ class MainActivity : ComponentActivity() {
                                             packageName,
                                         )
                                     check(clientIdResource != 0) {
-                                        "default_web_client_id fehlt in der Firebase-Konfiguration."
+                                        text(
+                                            TextKey
+                                                .DEFAULT_WEB_CLIENT_ID_IS_MISSING_FROM_THE_FIREBASE_CONFIGURATION
+                                        )
                                     }
                                     val option =
                                         GetSignInWithGoogleOption.Builder(
                                                 getString(clientIdResource)
                                             )
                                             .build()
-                                    stage = "Google-Kontoauswahl"
+                                    stage = text(TextKey.GOOGLE_ACCOUNT_SELECTION)
                                     val result =
                                         CredentialManager.create(this@MainActivity)
                                             .getCredential(
@@ -88,7 +95,7 @@ class MainActivity : ComponentActivity() {
                                                     .build(),
                                             )
                                     val credential = result.credential
-                                    stage = "Google-Anmeldedaten"
+                                    stage = text(TextKey.GOOGLE_CREDENTIALS)
                                     check(
                                         credential is CustomCredential &&
                                             credential.type ==
@@ -97,7 +104,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                     val token =
                                         GoogleIdTokenCredential.createFrom(credential.data).idToken
-                                    stage = "Firebase-Anmeldung"
+                                    stage = text(TextKey.FIREBASE_SIGN_IN)
                                     FirebaseAuth.getInstance()
                                         .signInWithCredential(
                                             GoogleAuthProvider.getCredential(token, null)
@@ -108,14 +115,21 @@ class MainActivity : ComponentActivity() {
                                 } catch (e: Exception) {
                                     Log.e(
                                         "KinderalltagAuth",
-                                        "Google-Anmeldung fehlgeschlagen: $stage",
+                                        text(TextKey.GOOGLE_SIGN_IN_FAILED, stage),
                                         e,
                                     )
                                     loginError =
-                                        if (stage == "Konfiguration") {
-                                            "Google-Anmeldung ist noch nicht konfiguriert. Google in Firebase Authentication aktivieren und die aktualisierte google-services.json einbauen."
+                                        if (stage == text(TextKey.CONFIGURATION)) {
+                                            text(
+                                                TextKey
+                                                    .GOOGLE_SIGN_IN_IS_NOT_CONFIGURED_YET_ENABLE_GOOGLE_IN_FIREBASE_AUTHENTIC
+                                            )
                                         } else {
-                                            "Anmeldung nicht abgeschlossen ($stage). Google-Konfiguration, Internet und Signatur-Fingerabdruck prüfen."
+                                            text(
+                                                TextKey
+                                                    .SIGN_IN_WAS_NOT_COMPLETED_CHECK_GOOGLE_CONFIGURATION_INTERNET_AND_SIGNIN,
+                                                stage,
+                                            )
                                         }
                                 } finally {
                                     signingIn = false
@@ -161,7 +175,7 @@ class MainActivity : ComponentActivity() {
             val text = incoming.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
             inbox.receive(uris, text?.takeIf { uris.isEmpty() })
         } catch (_: Exception) {
-            inbox.reportError("Die geteilte Kalenderdatei konnte nicht geöffnet werden.")
+            inbox.reportError(text(TextKey.THE_SHARED_CALENDAR_FILE_COULD_NOT_BE_OPENED))
         }
     }
 
@@ -181,20 +195,23 @@ private fun SetupScreen() {
         ) {
             Text("Kinderalltag", style = MaterialTheme.typography.headlineLarge)
             AppBanner(
-                "Ein gemeinsamer Blick auf euren Tag.",
+                text(TextKey.A_SHARED_VIEW_OF_YOUR_DAY),
                 when (AppTheme.definition.id) {
-                    AppThemeId.GARDEN -> "Kleine Aufgaben für euren Familiengarten."
-                    AppThemeId.PLAY -> "Spielend gemeinsam durch euren Tag."
-                    AppThemeId.SPACE -> "Gemeinsam auf Alltagsmission."
-                    AppThemeId.ANIMALS -> "Tierisch gut gemeinsam durch euren Tag."
-                    AppThemeId.VEHICLES -> "Gemeinsam durch den Alltag rollen."
-                    AppThemeId.NATURE -> "Gemeinsam durch euren Alltag wachsen."
-                    AppThemeId.FARM -> "Gemeinsam euren Familienalltag ernten."
-                    AppThemeId.MAGIC -> "Ein bisschen Alltagszauber für eure Familie."
+                    AppThemeId.GARDEN -> text(TextKey.LITTLE_TASKS_FOR_YOUR_FAMILY_GARDEN)
+                    AppThemeId.PLAY -> text(TextKey.PLAYING_THROUGH_YOUR_DAY_TOGETHER)
+                    AppThemeId.SPACE -> text(TextKey.ON_AN_EVERYDAY_MISSION_TOGETHER)
+                    AppThemeId.ANIMALS ->
+                        text(TextKey.AN_ANIMAL_ADVENTURE_THROUGH_YOUR_DAY_TOGETHER)
+                    AppThemeId.VEHICLES -> text(TextKey.ROLLING_THROUGH_EVERYDAY_LIFE_TOGETHER)
+                    AppThemeId.NATURE -> text(TextKey.GROWING_THROUGH_YOUR_DAY_TOGETHER)
+                    AppThemeId.FARM -> text(TextKey.REAPING_THE_REWARDS_OF_FAMILY_LIFE_TOGETHER)
+                    AppThemeId.MAGIC -> text(TextKey.A_LITTLE_EVERYDAY_MAGIC_FOR_YOUR_FAMILY)
                 },
             )
             Text(
-                "Die Firebase-Verbindung ist noch nicht eingerichtet. Bitte google-services.json im app-Ordner ergänzen und die App neu bauen. Die Anleitung steht in docs/SETUP.md."
+                text(
+                    TextKey.FIREBASE_IS_NOT_CONFIGURED_YET_ADD_GOOGLE_SERVICES_JSON_TO_THE_APP_FOLDE
+                )
             )
         }
     }

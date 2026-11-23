@@ -1,5 +1,6 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
@@ -56,8 +57,8 @@ object CalendarExchange {
     }
 
     fun parse(text: String, now: Instant = Instant.now()): CalendarImportResult {
-        require(text.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) {
-            "Kalenderdatei ist größer als 1 MB."
+        requireLocalized(text.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) {
+            message(TextKey.THE_CALENDAR_FILE_IS_LARGER_THAN_1_MB)
         }
         val lines = mutableListOf<String>()
         text.removePrefix("\uFEFF").replace("\r\n", "\n").replace('\r', '\n').split('\n').forEach {
@@ -66,11 +67,11 @@ object CalendarExchange {
                 lines[lines.lastIndex] += line.drop(1)
             else lines += line
         }
-        require(
+        requireLocalized(
             lines.any { it.equals("BEGIN:VCALENDAR", true) } &&
                 lines.any { it.equals("END:VCALENDAR", true) }
         ) {
-            "Keine gültige iCalendar-Datei (.ics)."
+            message(TextKey.NOT_A_VALID_ICALENDAR_FILE_ICS)
         }
         val imported = mutableListOf<CalendarImport>()
         val errors = mutableListOf<String>()
@@ -80,10 +81,10 @@ object CalendarExchange {
         lines.forEach { line ->
             when {
                 line.equals("BEGIN:VEVENT", true) -> {
-                    require(++count <= MAX_EVENTS) {
-                        "Bitte höchstens 100 Termine auf einmal importieren."
+                    requireLocalized(++count <= MAX_EVENTS) {
+                        message(TextKey.PLEASE_IMPORT_NO_MORE_THAN_100_APPOINTMENTS_AT_ONCE)
                     }
-                    require(event == null) { "Ungültige verschachtelte Termine." }
+                    requireLocalized(event == null) { message(TextKey.INVALID_NESTED_APPOINTMENTS) }
                     event = mutableListOf()
                     depth = 0
                 }
@@ -92,7 +93,11 @@ object CalendarExchange {
                         imported += parseEvent(requireNotNull(event), now)
                     } catch (e: Exception) {
                         errors +=
-                            "Termin $count: ${e.message ?: "Kalenderformat nicht unterstützt."}"
+                            text(
+                                TextKey.APPOINTMENT_8435F7,
+                                count,
+                                e.message ?: text(TextKey.CALENDAR_FORMAT_NOT_SUPPORTED),
+                            )
                     }
                     event = null
                 }
@@ -102,8 +107,8 @@ object CalendarExchange {
                 event != null && depth == 1 && line.startsWith("TRIGGER", true) -> event!!.add(line)
             }
         }
-        require(event == null && count > 0) {
-            "Die Kalenderdatei enthält keinen vollständigen Termin."
+        requireLocalized(event == null && count > 0) {
+            message(TextKey.THE_CALENDAR_FILE_CONTAINS_NO_COMPLETE_APPOINTMENT)
         }
         val unique =
             imported.distinctBy { item ->
@@ -147,44 +152,44 @@ object CalendarExchange {
         val properties = lines.mapNotNull(::property).groupBy { it.name }
         fun one(name: String): Property? {
             val values = properties[name].orEmpty()
-            require(values.size <= 1) { "$name ist mehrfach vorhanden." }
+            requireLocalized(values.size <= 1) { message(TextKey.APPEARS_MORE_THAN_ONCE, name) }
             return values.firstOrNull()
         }
-        require(one("STATUS")?.value?.uppercase(Locale.ROOT) != "CANCELLED") {
-            "Dieser Termin ist abgesagt."
+        requireLocalized(one("STATUS")?.value?.uppercase(Locale.ROOT) != "CANCELLED") {
+            message(TextKey.THIS_APPOINTMENT_IS_CANCELLED)
         }
-        require(
+        requireLocalized(
             "RECURRENCE-ID" !in properties && "EXDATE" !in properties && "RDATE" !in properties
         ) {
-            "Serien mit einzelnen Ausnahmen bitte als einzelne Termine teilen."
+            message(TextKey.PLEASE_SHARE_SERIES_WITH_INDIVIDUAL_EXCEPTIONS_AS_SEPARATE_APPOINTMENTS)
         }
-        val start = requireNotNull(one("DTSTART")) { "Startdatum fehlt." }
+        val start = requireNotNullLocalized(one("DTSTART")) { message(TextKey.START_DATE_MISSING) }
         val allDay = start.parameters["VALUE"] == "DATE" || start.value.length == 8
         val startDate =
             if (allDay) LocalDate.parse(start.value, dateFormat)
             else instant(start).atZone(FAMILY_ZONE).toLocalDate()
-        require(startDate.year in 1..9999) { "Das Jahr wird nicht unterstützt." }
+        requireLocalized(startDate.year in 1..9999) { message(TextKey.THIS_YEAR_IS_NOT_SUPPORTED) }
         val startTime =
             if (allDay) LocalTime.of(9, 0) else instant(start).atZone(FAMILY_ZONE).toLocalTime()
         val warnings = mutableListOf<String>()
         val end = one("DTEND")
         val duration = one("DURATION")
-        require(end == null || duration == null) {
-            "DTEND und DURATION dürfen nicht zusammen vorkommen."
+        requireLocalized(end == null || duration == null) {
+            message(TextKey.DTEND_AND_DURATION_CANNOT_APPEAR_TOGETHER)
         }
         val endTime: LocalTime
         if (allDay) {
             duration?.let {
-                require(Duration.parse(it.value) == Duration.ofDays(1)) {
-                    "Mehrtagestermine werden noch nicht unterstützt."
+                requireLocalized(Duration.parse(it.value) == Duration.ofDays(1)) {
+                    message(TextKey.MULTI_DAY_APPOINTMENTS_ARE_NOT_SUPPORTED_YET)
                 }
             }
             val exclusive =
                 end?.let { LocalDate.parse(it.value, dateFormat) }
                     ?: duration?.let { startDate.plusDays(Duration.parse(it.value).toDays()) }
                     ?: startDate.plusDays(1)
-            require(exclusive == startDate.plusDays(1)) {
-                "Mehrtagestermine werden noch nicht unterstützt."
+            requireLocalized(exclusive == startDate.plusDays(1)) {
+                message(TextKey.MULTI_DAY_APPOINTMENTS_ARE_NOT_SUPPORTED_YET)
             }
             endTime = LocalTime.of(10, 0)
         } else {
@@ -193,13 +198,13 @@ object CalendarExchange {
                     ?: instant(start)
                         .plus(duration?.let { Duration.parse(it.value) } ?: Duration.ofHours(1))
             val endLocal = endInstant.atZone(FAMILY_ZONE)
-            require(endLocal.toLocalDate() == startDate && endInstant > instant(start)) {
-                "Bitte einen Termin mit Beginn und Ende am selben Tag teilen."
+            requireLocalized(endLocal.toLocalDate() == startDate && endInstant > instant(start)) {
+                message(TextKey.PLEASE_SHARE_AN_APPOINTMENT_THAT_STARTS_AND_ENDS_ON_THE_SAME_DAY)
             }
             endTime = endLocal.toLocalTime()
             if (end == null && duration == null)
                 warnings +=
-                    "Keine Endzeit angegeben: Bitte die vorgeschlagene Dauer von einer Stunde prüfen."
+                    text(TextKey.NO_END_TIME_SPECIFIED_PLEASE_CHECK_THE_SUGGESTED_ONE_HOUR_DURATION)
         }
         val trigger = properties["TRIGGER"].orEmpty()
         val defaultReminder = if (allDay) 1440 else 30
@@ -219,13 +224,16 @@ object CalendarExchange {
                     minutes
                 else {
                     warnings +=
-                        "Bitte die Erinnerung neu wählen; die Kalenderdatei verwendet eine andere Erinnerungsart."
+                        text(
+                            TextKey
+                                .PLEASE_SELECT_THE_REMINDER_AGAIN_THE_CALENDAR_FILE_USES_A_DIFFERENT_REMI
+                        )
                     defaultReminder
                 }
             }
         val details =
             AppointmentDetails(
-                unescape(one("SUMMARY")?.value ?: "Termin"),
+                unescape(one("SUMMARY")?.value ?: text(TextKey.APPOINTMENT)),
                 AppointmentRecipient.HOUSEHOLD,
                 startDate,
                 startTime,
@@ -243,8 +251,8 @@ object CalendarExchange {
                 rule.value.uppercase(Locale.ROOT).split(';').map {
                     it.substringBefore('=') to it.substringAfter('=', "")
                 }
-            require(entries.map { it.first }.distinct().size == entries.size) {
-                "Doppelte Wiederholungsangaben."
+            requireLocalized(entries.map { it.first }.distinct().size == entries.size) {
+                message(TextKey.DUPLICATE_RECURRENCE_FIELDS)
             }
             val r = entries.toMap()
             require(
@@ -262,7 +270,9 @@ object CalendarExchange {
                         )
                 }
             ) {
-                "Diese Wiederholungsregel wird noch nicht unterstützt. Bitte einen einzelnen Termin teilen."
+                text(
+                    TextKey.THIS_RECURRENCE_RULE_IS_NOT_SUPPORTED_YET_PLEASE_SHARE_A_SINGLE_APPOINTM
+                )
             }
             repeat =
                 when (r["FREQ"]) {
@@ -270,38 +280,45 @@ object CalendarExchange {
                     "WEEKLY" -> AppointmentRepeat.WEEKS
                     "MONTHLY" -> AppointmentRepeat.MONTHS
                     "YEARLY" -> AppointmentRepeat.YEARS
-                    else -> error("Diese Wiederholung wird noch nicht unterstützt.")
+                    else ->
+                        throw LocalizedStateException(
+                            message(TextKey.THIS_RECURRENCE_IS_NOT_SUPPORTED_YET)
+                        )
                 }
             interval = r["INTERVAL"]?.toInt() ?: 1
-            require(interval in 1..1000) { "Intervall muss zwischen 1 und 1000 liegen." }
+            requireLocalized(interval in 1..1000) {
+                message(TextKey.THE_INTERVAL_MUST_BE_BETWEEN_1_AND_1000)
+            }
             val weekday =
                 listOf("MO", "TU", "WE", "TH", "FR", "SA", "SU")[startDate.dayOfWeek.value - 1]
-            require(
+            requireLocalized(
                 r["WKST"] == null || r["WKST"] in listOf("MO", "TU", "WE", "TH", "FR", "SA", "SU")
             ) {
-                "Ungültiger Wochenbeginn."
+                message(TextKey.INVALID_WEEK_START)
             }
-            require(
+            requireLocalized(
                 r["BYDAY"] == null || (repeat == AppointmentRepeat.WEEKS && r["BYDAY"] == weekday)
             ) {
-                "Mehrere oder besondere Wochentage bitte als einzelne Termine teilen."
+                message(
+                    TextKey.PLEASE_SHARE_MULTIPLE_OR_SPECIAL_WEEKDAYS_AS_INDIVIDUAL_APPOINTMENTS
+                )
             }
-            require(
+            requireLocalized(
                 r["BYMONTHDAY"] == null ||
                     (repeat in listOf(AppointmentRepeat.MONTHS, AppointmentRepeat.YEARS) &&
                         r["BYMONTHDAY"] == startDate.dayOfMonth.toString())
             ) {
-                "Diese Monatstagsregel wird nicht unterstützt."
+                message(TextKey.THIS_DAY_OF_MONTH_RULE_IS_NOT_SUPPORTED)
             }
-            require(
+            requireLocalized(
                 r["BYMONTH"] == null ||
                     (repeat == AppointmentRepeat.YEARS &&
                         r["BYMONTH"] == startDate.monthValue.toString())
             ) {
-                "Diese Monatsregel wird nicht unterstützt."
+                message(TextKey.THIS_MONTHLY_RULE_IS_NOT_SUPPORTED)
             }
-            require(!("COUNT" in r && "UNTIL" in r)) {
-                "COUNT und UNTIL dürfen nicht zusammen vorkommen."
+            requireLocalized(!("COUNT" in r && "UNTIL" in r)) {
+                message(TextKey.COUNT_AND_UNTIL_CANNOT_APPEAR_TOGETHER)
             }
             r["UNTIL"]?.let {
                 if (it.length == 8) until = LocalDate.parse(it, dateFormat)
@@ -315,7 +332,9 @@ object CalendarExchange {
             }
             r["COUNT"]?.let {
                 val count = it.toInt()
-                require(count in 1..10000) { "Bitte höchstens 10000 Wiederholungen importieren." }
+                requireLocalized(count in 1..10000) {
+                    message(TextKey.PLEASE_IMPORT_NO_MORE_THAN_10000_OCCURRENCES)
+                }
                 until = AppointmentSeries("count", details, repeat, interval).dateAt(count - 1L)
             }
             if (
@@ -325,7 +344,10 @@ object CalendarExchange {
                         startDate.dayOfMonth == 29)
             ) {
                 warnings +=
-                    "Bitte den Rhythmus prüfen: Kinderalltag nutzt bei fehlenden Monatstagen den letzten Tag des Monats."
+                    text(
+                        TextKey
+                            .PLEASE_CHECK_THE_RHYTHM_KINDERALLTAG_USES_THE_LAST_DAY_OF_THE_MONTH_WHEN
+                    )
             }
             if (
                 !allDay &&
@@ -333,11 +355,14 @@ object CalendarExchange {
                         start.parameters["TZID"]?.let { it != FAMILY_ZONE.id } == true)
             ) {
                 warnings +=
-                    "Die Serie wird in Europe/Berlin übernommen. Bitte Uhrzeit und Sommerzeitwechsel prüfen."
+                    text(
+                        TextKey
+                            .THE_SERIES_WILL_USE_EUROPE_BERLIN_PLEASE_CHECK_THE_TIME_AND_DAYLIGHT_SAV
+                    )
             }
         }
-        require(until == null || until!!.year in 1..9999) {
-            "Das Ende der Serie liegt außerhalb des unterstützten Datumsbereichs."
+        requireLocalized(until == null || until!!.year in 1..9999) {
+            message(TextKey.THE_SERIES_END_IS_OUTSIDE_THE_SUPPORTED_DATE_RANGE)
         }
         var series =
             AppointmentSeries(UUID.randomUUID().toString(), details, repeat, interval, until)
@@ -348,7 +373,9 @@ object CalendarExchange {
             if (next != null && details.copy(date = next).startInstant <= now)
                 next = series.nextDate(today.plusDays(1))
             if (next != null) series = series.copy(fromDate = next)
-            else warnings += "Diese Serie ist bereits beendet. Bitte Datum und Wiederholung prüfen."
+            else
+                warnings +=
+                    text(TextKey.THIS_SERIES_HAS_ALREADY_ENDED_PLEASE_CHECK_THE_DATE_AND_RECURRENCE)
         }
         return CalendarImport(series, warnings)
     }
@@ -363,7 +390,9 @@ object CalendarExchange {
             else
                 property.parameters["TZID"]?.let {
                     runCatching { ZoneId.of(it) }
-                        .getOrElse { error("Zeitzone wird nicht unterstützt.") }
+                        .getOrElse {
+                            throw LocalizedStateException(message(TextKey.TIMEZONE_NOT_SUPPORTED))
+                        }
                 } ?: FAMILY_ZONE
         return local.atZone(zone).toInstant()
     }

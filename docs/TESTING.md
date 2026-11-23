@@ -2,7 +2,7 @@
 
 ## App themes
 
-Local validation: all **246 Android JVM tests** pass, together with Spotless, Android Lint and debug assembly. The preview composables compile as part of the app build.
+Local validation: all **257 Android JVM tests** pass, together with Spotless, Android Lint and debug assembly. The preview composables compile as part of the app build.
 
 `AppThemeTest` checks stable saved IDs and Garden fallback, readable text/button contrast for all palettes, Garden palette compatibility, preserved child color choices and complete theme-specific illustration mappings. `ThemePreviews.kt` provides parameterized Garden/Play/Space/Animals/Vehicles/Nature/Farm/Magic previews for Home, display settings, task details, the monthly tracker and artwork/bear galleries. Home also has a 320dp/large-font preview. They use sample data and do not require Firebase.
 
@@ -302,3 +302,13 @@ ListOrderingTest covers alphabetical compatibility, saved order and new items, i
 Phone acceptance after publishing the rules: in both Einkaufsliste and Geschenkideen, drag the first item down and the last up, cancel a drag, drag past screen edges in a long list, and use tap-menu and TalkBack Nach oben/Nach unten. Verify card opening and purchase checkboxes still work. Repeat with long titles, labels, 150–200% text, child/label filters, collapsed/expanded Gekauft and all themes. Confirm filters retain hidden positions, shopping Home follows the shared order, new items append, and bought/reopened/deleted/restored items keep expected state and positions.
 
 Check persistence after relaunch and on the other phone; attempt simultaneous reorders and observe a clear conflict without lost items. Modify/buy/delete an entry or change filters while dragging, and verify stale dragging cancels. Disconnect before/during a save: ordering must be disabled or roll back with an error, and offline purchase/creation must still work. Reordering must create no purchase/activity notification, Verlauf entry or statistics count.
+
+## German and English
+
+LocalizationTest checks all 666 typed string keys against both resource catalogs, placeholder parity and valid formatting, plural forms, typed validation errors, dynamic theme/household labels, stable starter-label IDs, unchanged user text, English/German dictation separators and reviewed compounds, weekday/date/12–24-hour formatting, unsupported-language and regional fallback, reminder subject rendering, locale metadata, and independent preview scopes. Android Lint treats missing/extra translations and invalid/mismatched format strings as errors.
+
+Device acceptance (not established by JVM tests or compiled previews): test Android 8–12 and Android 13+, on two phones. Change System → Deutsch → English → System, restart the process and reboot, and also change language via Android's app-language settings. Check independent choices, persistence, unsupported system languages, preferred-language lists, and regional English date formats with explicit 12/24-hour settings. Confirm navigation, selected dates/filters, themes, child colours, assignments, list order and editor drafts survive recreation; synchronization errors must use the selected language.
+
+Review Home, tasks, appointments, shopping/gifts, occurrence selection, history/statistics, trash, login/setup, legal headings, metadata badges, accessibility descriptions and all eight themes in both languages, including 320dp/large text. ThemePreviews includes English Home/settings/details/tracker previews. Verify native pickers, German and English speech, shopping review, Google sign-in and calendar sharing/import. Do not expect user-authored text, names, saved labels, contact details or external-app screens to translate.
+
+Schedule reminders, change language before delivery, and verify background/cold-start delivery and channel names, including legacy cached reminders and both-child/household subjects. Confirm channel IDs and notification preferences remain stable and completed tasks still suppress reminders; switching languages must not replay activity notices. New preset labels translate while existing/customized labels remain unchanged. No Firebase rules changes accompany this feature.

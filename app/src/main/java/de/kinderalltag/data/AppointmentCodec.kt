@@ -3,6 +3,7 @@ package de.kinderalltag.data
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -85,7 +86,7 @@ internal fun decodeAppointmentActivity(doc: DocumentSnapshot) =
         details = decodeDetails(doc.get("details") as Map<*, *>),
         resultSeriesId = doc.getString("resultSeriesId"),
         authorId = requireNotNull(doc.getString("authorId")),
-        authorName = doc.getString("authorName") ?: "Elternteil",
+        authorName = doc.getString("authorName") ?: text(TextKey.PARENT),
         millis = doc.getTimestamp("createdAt")?.toDate()?.time ?: 0,
     )
 

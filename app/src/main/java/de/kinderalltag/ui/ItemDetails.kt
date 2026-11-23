@@ -22,6 +22,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import de.kinderalltag.data.*
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -83,7 +84,7 @@ internal fun ItemDetailsDialog(
                         )
                     }
                     IconButton(onClick = onDismiss, enabled = !busy) {
-                        Icon(Icons.Default.Close, "Schließen")
+                        Icon(Icons.Default.Close, text(TextKey.CLOSE))
                     }
                 }
                 Column(
@@ -297,7 +298,7 @@ internal fun TaskDefinitionDialog(
         }
     ItemDetailsDialog(
         task.title,
-        "Aufgabe",
+        text(TextKey.TASK),
         onDismiss,
         busy,
         actions = {
@@ -307,7 +308,8 @@ internal fun TaskDefinitionDialog(
                         if (!selection.historical) {
                             add(
                                 DetailActionSpec(
-                                    if (selection.editable.active) "Bearbeiten" else "Fortsetzen",
+                                    if (selection.editable.active) text(TextKey.EDIT)
+                                    else text(TextKey.RESUME),
                                     if (selection.editable.active) Icons.Default.Edit
                                     else Icons.Default.PlayArrow,
                                     canManage,
@@ -317,7 +319,7 @@ internal fun TaskDefinitionDialog(
                             if (selection.editable.active)
                                 add(
                                     DetailActionSpec(
-                                        "Pausieren",
+                                        text(TextKey.PAUSE),
                                         Icons.Default.Pause,
                                         canManage,
                                         onClick = onPause,
@@ -327,7 +329,7 @@ internal fun TaskDefinitionDialog(
                     },
                 deleteAction =
                     DetailActionSpec(
-                        "Löschen",
+                        text(TextKey.DELETE),
                         Icons.Default.DeleteOutline,
                         canManage,
                         onClick = onDelete,
@@ -335,15 +337,15 @@ internal fun TaskDefinitionDialog(
             )
         },
     ) {
-        DetailSection("Auf einen Blick", AppTheme.colors.accentContainer) {
+        DetailSection(text(TextKey.AT_A_GLANCE), AppTheme.colors.accentContainer) {
             DetailValue(
                 Icons.Default.Face,
-                "Bereich",
-                state.sections.firstOrNull { it.id == task.childId }?.name ?: "Bereich",
+                text(TextKey.AREA),
+                state.sections.firstOrNull { it.id == task.childId }?.name ?: text(TextKey.AREA),
             )
             DetailValue(
                 Icons.Default.Schedule,
-                "Uhrzeiten",
+                text(TextKey.TIMES),
                 task.times.joinToString(" · ", transform = formats::time),
             )
             val recurrence =
@@ -356,41 +358,42 @@ internal fun TaskDefinitionDialog(
                             }
                     else -> frequencyLabel(task.frequency, task.interval)
                 }
-            DetailValue(Icons.Default.Repeat, "Wiederholung", recurrence)
+            DetailValue(Icons.Default.Repeat, text(TextKey.RECURRENCE), recurrence)
             DetailValue(
                 Icons.Default.DateRange,
-                if (task.frequency == Frequency.ONCE) "Datum" else "Zeitraum",
+                if (task.frequency == Frequency.ONCE) text(TextKey.DATE) else text(TextKey.PERIOD),
                 if (task.frequency == Frequency.ONCE) formats.fullDate(task.start)
                 else
-                    "Ab ${formats.date(task.start)}" +
-                        (task.end?.let { " bis ${formats.date(it)}" } ?: " · ohne Enddatum"),
+                    text(TextKey.FROM, formats.date(task.start)) +
+                        (task.end?.let { text(TextKey.UNTIL_1_S, formats.date(it)) }
+                            ?: text(TextKey.NO_END_DATE)),
             )
             DetailValue(
                 Icons.Default.Person,
-                "Zuständig",
+                text(TextKey.ASSIGNED_TO),
                 responsibilityName(task.responsibleParentId, state.parents),
             )
             if (upcoming != null)
                 DetailValue(
                     Icons.Default.Event,
-                    "Nächste Ausführung",
+                    text(TextKey.NEXT_OCCURRENCE),
                     "${formats.fullDate(upcoming.date)} · ${formats.time(upcoming.time)}",
                 )
         }
-        DetailSection("Ausführungen", AppTheme.colors.background) {
+        DetailSection(text(TextKey.OCCURRENCES), AppTheme.colors.background) {
             Text(
-                "Wähle Tag und Uhrzeit, um eine Ausführung zu bestätigen – auch im Voraus.",
+                text(TextKey.CHOOSE_A_DAY_AND_TIME_TO_CONFIRM_AN_OCCURRENCE_INCLUDING_IN_ADVANCE),
                 style = MaterialTheme.typography.bodySmall,
             )
             DatePickerField(
-                "Tag",
+                text(TextKey.DAY),
                 LocalDate.parse(executionDate),
                 onSelect = { date -> date?.let { executionDate = it.toString() } },
                 enabled = !busy,
             )
             if (executions.isEmpty())
                 Text(
-                    "Für diesen Tag ist keine Ausführung geplant.",
+                    text(TextKey.NO_OCCURRENCE_IS_SCHEDULED_FOR_THIS_DAY),
                     style = MaterialTheme.typography.bodySmall,
                 )
             executions.forEach { occurrence ->
@@ -403,7 +406,7 @@ internal fun TaskDefinitionDialog(
                     Icon(if (completed) Icons.Default.CheckCircle else Icons.Default.Schedule, null)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "${formats.time(occurrence.time)} · ${if (completed) "Erledigt · Details" else "Ausführung bestätigen"}",
+                        "${formats.time(occurrence.time)} · ${if (completed) text(TextKey.COMPLETED_DETAILS) else text(TextKey.CONFIRM_OCCURRENCE)}",
                         modifier = Modifier.weight(1f),
                     )
                     Icon(Icons.Default.ChevronRight, null)
@@ -412,27 +415,27 @@ internal fun TaskDefinitionDialog(
         }
         TaskCompletionOverview(task.taskId, state, now, selection.date)
         if (task.notes.isNotBlank())
-            DetailSection("Notizen", AppTheme.colors.background) { Text(task.notes) }
+            DetailSection(text(TextKey.NOTES), AppTheme.colors.background) { Text(task.notes) }
         if (!selection.editable.active)
             DetailNotice(
-                "Diese Aufgabe ist pausiert. Mit Fortsetzen wählt ihr die nächste Ausführung."
+                text(TextKey.THIS_TASK_IS_PAUSED_RESUME_LETS_YOU_CHOOSE_THE_NEXT_OCCURRENCE)
             )
         else if (selection.historical)
             DetailNotice(
-                "Vergangene Ausführungen bleiben unverändert. Ihr könnt sie löschen und im Papierkorb wiederherstellen."
+                text(
+                    TextKey.PAST_OCCURRENCES_REMAIN_UNCHANGED_YOU_CAN_DELETE_THEM_AND_RESTORE_THEM_F
+                )
             )
         else
             Text(
-                "Änderungen gelten für kommende, unbestätigte Ausführungen. Begonnene Ausführungen und Bestätigungen bleiben erhalten.",
+                text(
+                    TextKey.CHANGES_APPLY_TO_UPCOMING_UNCONFIRMED_OCCURRENCES_STARTED_OCCURRENCES_AN
+                ),
                 style = MaterialTheme.typography.bodySmall,
             )
         if (!current)
-            DetailNotice(
-                "Diese Aufgabe wurde geändert. Bitte schließen und die Übersicht neu öffnen."
-            )
+            DetailNotice(text(TextKey.THIS_TASK_HAS_CHANGED_PLEASE_CLOSE_AND_REOPEN_THE_OVERVIEW))
         if (state.fromCache)
-            DetailNotice(
-                "Gespeicherter Stand. Zum Bearbeiten oder Löschen ist eine Verbindung erforderlich."
-            )
+            DetailNotice(text(TextKey.SAVED_DATA_EDITING_OR_DELETING_REQUIRES_A_CONNECTION))
     }
 }

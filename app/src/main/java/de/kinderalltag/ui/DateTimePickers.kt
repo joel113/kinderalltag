@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import de.kinderalltag.domain.FAMILY_ZONE
+import de.kinderalltag.text.*
+import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -24,10 +26,16 @@ import java.time.ZoneId
 @Composable
 internal fun rememberDateTimeFormats(): DateTimeFormats {
     val context = LocalContext.current
-    val locale = LocalConfiguration.current.locales[0]
-    val use24Hour = DateFormat.is24HourFormat(context)
+    val locale = presentationLocale(LocalConfiguration.current)
+    val use24Hour = uses24HourClock(context)
     return remember(locale, use24Hour) {
-        DateTimeFormats(locale, DateFormat.getTimeFormat(context))
+        DateTimeFormats(
+            locale,
+            SimpleDateFormat(
+                DateFormat.getBestDateTimePattern(locale, if (use24Hour) "Hm" else "hm"),
+                locale,
+            ),
+        )
     }
 }
 
@@ -56,7 +64,8 @@ internal fun DatePickerField(
                 Text(label, style = MaterialTheme.typography.labelMedium)
                 Text(
                     value?.let(formats::date)
-                        ?: if (optional) "Kein Enddatum" else "Datum auswählen",
+                        ?: if (optional) text(TextKey.NO_END_DATE_08A7C2)
+                        else text(TextKey.SELECT_DATE),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -65,7 +74,7 @@ internal fun DatePickerField(
         }
         if (optional && value != null)
             IconButton(onClick = { onSelect(null) }, enabled = enabled) {
-                Icon(Icons.Default.Close, "$label entfernen")
+                Icon(Icons.Default.Close, text(TextKey.REMOVE, label))
             }
     }
     if (open) {
@@ -77,7 +86,7 @@ internal fun DatePickerField(
             maxDate?.let { if (initial > it) initial = it }
             val dialog =
                 DatePickerDialog(
-                    context,
+                    languageContext(context),
                     { _, year, month, day ->
                         latestSelect(LocalDate.of(year, month + 1, day))
                         open = false
@@ -136,7 +145,7 @@ internal fun TimePickerField(
         }
         onRemove?.let { remove ->
             IconButton(onClick = remove, enabled = enabled) {
-                Icon(Icons.Default.Close, "$label entfernen")
+                Icon(Icons.Default.Close, text(TextKey.REMOVE, label))
             }
         }
     }
@@ -167,7 +176,7 @@ private fun NativeTimeDialog(
                 { _, hour, minute -> latestSelect(LocalTime.of(hour, minute)) },
                 initial.hour,
                 initial.minute,
-                DateFormat.is24HourFormat(context),
+                uses24HourClock(context),
             )
         dialog.setOnDismissListener { latestDismiss() }
         dialog.show()
@@ -189,7 +198,7 @@ internal fun TimeSlotsPicker(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         times.forEachIndexed { index, time ->
             TimePickerField(
-                if (times.size == 1) "Uhrzeit" else "Uhrzeit ${index + 1}",
+                if (times.size == 1) text(TextKey.TIME) else text(TextKey.TIME_A3636D, index + 1),
                 time,
                 onSelect = { selected ->
                     duplicate =
@@ -208,9 +217,9 @@ internal fun TimeSlotsPicker(
             )
         }
         if (duplicate)
-            Text("Diese Uhrzeit ist bereits vorhanden.", color = MaterialTheme.colorScheme.error)
+            Text(text(TextKey.THIS_TIME_ALREADY_EXISTS), color = MaterialTheme.colorScheme.error)
         TextButton(onClick = { adding = true }, enabled = enabled && times.size < 8) {
-            Text("Uhrzeit hinzufügen (${times.size}/8)")
+            Text(text(TextKey.ADD_TIME_8, times.size))
         }
     }
     if (adding)

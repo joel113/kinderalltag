@@ -1,5 +1,6 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
 import java.time.LocalDate
 
 enum class AppointmentActivityKind {
@@ -88,7 +89,7 @@ fun activityHistory(
     operations: List<ItemOperation> = emptyList(),
     listActivity: List<ListActivity> = emptyList(),
 ): List<HistoryEntry> {
-    fun name(id: String) = parents.firstOrNull { it.id == id }?.name ?: "Elternteil"
+    fun name(id: String) = parents.firstOrNull { it.id == id }?.name ?: text(TextKey.PARENT)
     val entries = mutableListOf<HistoryEntry>()
     events.forEach { event ->
         val task =
@@ -102,9 +103,9 @@ fun activityHistory(
             HistoryEntry(
                 "task-event:${event.id}",
                 if (event.clientMillis > 0) event.clientMillis else event.serverMillis ?: 0,
-                if (event.kind == EventKind.COMPLETE) "Aufgabe erledigt"
-                else "Bestätigung zurückgenommen",
-                task?.title ?: "Aufgabe",
+                if (event.kind == EventKind.COMPLETE) text(TextKey.TASK_COMPLETED)
+                else text(TextKey.CONFIRMATION_RETRACTED),
+                task?.title ?: text(TextKey.TASK),
                 event.authorId,
                 event.authorName,
                 childId = task?.childId,
@@ -134,10 +135,10 @@ fun activityHistory(
                             "task-revision:${revision.id}",
                             revision.createdMillis,
                             when {
-                                !revision.active -> "Aufgabe pausiert"
-                                index == 0 -> "Aufgabe angelegt"
-                                !ordered[index - 1].active -> "Aufgabe fortgesetzt"
-                                else -> "Aufgabe geändert"
+                                !revision.active -> text(TextKey.TASK_PAUSED)
+                                index == 0 -> text(TextKey.TASK_ADDED)
+                                !ordered[index - 1].active -> text(TextKey.TASK_RESUMED)
+                                else -> text(TextKey.TASK_CHANGED)
                             },
                             revision.title,
                             revision.authorId,
@@ -154,11 +155,13 @@ fun activityHistory(
                 "appointment-event:${event.id}",
                 event.millis,
                 when (event.kind) {
-                    AppointmentActivityKind.ADDED -> "Termin angelegt"
+                    AppointmentActivityKind.ADDED -> text(TextKey.APPOINTMENT_ADDED)
                     AppointmentActivityKind.CHANGED ->
-                        if (event.following) "Termin und folgende geändert" else "Termin geändert"
+                        if (event.following) text(TextKey.THIS_AND_FOLLOWING_APPOINTMENTS_CHANGED)
+                        else text(TextKey.APPOINTMENT_CHANGED)
                     AppointmentActivityKind.CANCELLED ->
-                        if (event.following) "Termin und folgende abgesagt" else "Termin abgesagt"
+                        if (event.following) text(TextKey.THIS_AND_FOLLOWING_APPOINTMENTS_CANCELLED)
+                        else text(TextKey.APPOINTMENT_CANCELLED)
                 },
                 event.details.title,
                 event.authorId,
@@ -187,7 +190,7 @@ fun activityHistory(
                 HistoryEntry(
                     "legacy-series:${item.id}",
                     item.createdMillis,
-                    "Termin angelegt",
+                    text(TextKey.APPOINTMENT_ADDED),
                     item.details.title,
                     item.authorId,
                     name(item.authorId),
@@ -213,8 +216,9 @@ fun activityHistory(
                 HistoryEntry(
                     "legacy-exception:${exception.id}",
                     exception.updatedMillis,
-                    if (exception.replacement == null) "Termin abgesagt" else "Termin geändert",
-                    details?.title ?: "Termin",
+                    if (exception.replacement == null) text(TextKey.APPOINTMENT_CANCELLED)
+                    else text(TextKey.APPOINTMENT_CHANGED),
+                    details?.title ?: text(TextKey.APPOINTMENT),
                     exception.authorId,
                     name(exception.authorId),
                     recipient = details?.recipient,
@@ -237,12 +241,13 @@ fun activityHistory(
                     if (task) HistoryKind.TASK_RESTORED else HistoryKind.APPOINTMENT_RESTORED
             }
         val action =
-            (if (task) "Aufgabe" else "Termin") +
+            (if (task) text(TextKey.TASK) else text(TextKey.APPOINTMENT)) +
                 when (operation.action) {
                     OperationAction.EDIT ->
-                        if (task && operation.task?.active == false) " pausiert" else " geändert"
-                    OperationAction.DELETE -> " gelöscht"
-                    OperationAction.RESTORE -> " wiederhergestellt"
+                        if (task && operation.task?.active == false) text(TextKey.PAUSED_91AB11)
+                        else text(TextKey.CHANGED)
+                    OperationAction.DELETE -> text(TextKey.DELETED)
+                    OperationAction.RESTORE -> text(TextKey.RESTORED)
                 }
         entries +=
             HistoryEntry(
@@ -261,15 +266,17 @@ fun activityHistory(
     }
     listActivity.forEach { event ->
         val item = event.snapshot
-        val prefix = if (item.kind == FamilyListKind.SHOPPING) "Einkauf" else "Geschenkidee"
+        val prefix =
+            if (item.kind == FamilyListKind.SHOPPING) text(TextKey.SHOPPING_ITEM)
+            else text(TextKey.GIFT_IDEA)
         val action =
             when (event.action) {
-                ListAction.ADDED -> "angelegt"
-                ListAction.CHANGED -> "geändert"
-                ListAction.BOUGHT -> "gekauft"
-                ListAction.REOPENED -> "wieder geöffnet"
-                ListAction.DELETED -> "gelöscht"
-                ListAction.RESTORED -> "wiederhergestellt"
+                ListAction.ADDED -> text(TextKey.ADDED)
+                ListAction.CHANGED -> text(TextKey.CHANGED_132B10)
+                ListAction.BOUGHT -> text(TextKey.BOUGHT_1F118D)
+                ListAction.REOPENED -> text(TextKey.REOPENED)
+                ListAction.DELETED -> text(TextKey.DELETED_D22871)
+                ListAction.RESTORED -> text(TextKey.RESTORED_9B1B84)
             }
         entries +=
             HistoryEntry(

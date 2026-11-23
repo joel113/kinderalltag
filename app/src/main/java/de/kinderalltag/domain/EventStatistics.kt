@@ -1,5 +1,6 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -84,9 +85,9 @@ fun eventStatistics(
         val id = parentId(entry)
         parentNames.putIfAbsent(
             id,
-            if (id == "__unknown__") "Unbekannt"
+            if (id == "__unknown__") text(TextKey.UNKNOWN)
             else if (entry.kind == HistoryKind.TASK_COMPLETED && !entry.creditedId.isNullOrBlank())
-                entry.creditedName?.takeIf { it.isNotBlank() } ?: "Elternteil"
+                entry.creditedName?.takeIf { it.isNotBlank() } ?: text(TextKey.PARENT)
             else entry.authorName,
         )
     }
@@ -94,9 +95,9 @@ fun eventStatistics(
         linkedMapOf(
             "ferdinand" to (children.firstOrNull { it.id == "ferdinand" }?.name ?: "Ferdinand"),
             "johann" to (children.firstOrNull { it.id == "johann" }?.name ?: "Johann"),
-            "both" to "Beide Kinder",
-            "haushalt" to "Haushalt",
-            "shopping" to "Einkäufe",
+            "both" to text(TextKey.BOTH_CHILDREN),
+            "haushalt" to text(TextKey.HOUSEHOLD),
+            "shopping" to text(TextKey.SHOPPING),
         )
     fun subjectId(entry: HistoryEntry): String =
         when {
@@ -110,7 +111,7 @@ fun eventStatistics(
             else -> "unknown"
         }
     val bySubject = uniqueEntries.groupBy(::subjectId)
-    if ("unknown" in bySubject) subjectNames["unknown"] = "Unbekannt"
+    if ("unknown" in bySubject) subjectNames["unknown"] = text(TextKey.UNKNOWN)
     val byParent = uniqueEntries.groupBy(::parentId)
     val byWeekday =
         uniqueEntries.groupBy { Instant.ofEpochMilli(it.millis).atZone(FAMILY_ZONE).dayOfWeek }

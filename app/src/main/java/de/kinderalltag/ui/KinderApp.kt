@@ -51,40 +51,46 @@ import de.kinderalltag.data.*
 import de.kinderalltag.domain.*
 import de.kinderalltag.notifications.ActivityNotifications
 import de.kinderalltag.notifications.ReminderScheduler
+import de.kinderalltag.text.*
 import java.time.*
 import java.util.UUID
 
-private enum class AppPage(val title: String) {
-    HOME("Heute"),
-    TASKS("Aufgaben"),
-    APPOINTMENTS("Termine"),
-    SHOPPING("Einkaufsliste"),
-    GIFTS("Geschenkideen"),
-    HISTORY("Verlauf"),
-    STATISTICS("Statistik"),
-    TRASH("Papierkorb"),
-    SETTINGS("Einstellungen"),
+private enum class AppPage(private val titleKey: TextKey) {
+    HOME(TextKey.TODAY),
+    TASKS(TextKey.TASKS),
+    APPOINTMENTS(TextKey.APPOINTMENTS),
+    SHOPPING(TextKey.SHOPPING_LIST),
+    GIFTS(TextKey.GIFT_IDEAS),
+    HISTORY(TextKey.HISTORY),
+    STATISTICS(TextKey.STATISTICS),
+    TRASH(TextKey.TRASH),
+    SETTINGS(TextKey.SETTINGS);
+
+    val title: String
+        get() = text(titleKey)
 }
 
 private val green = StatusColors.success
 
-private val taskEncouragements =
-    listOf(
-        "Verwalte Aufgaben, die erledigt werden müssen, und schaffe Platz im Kopf für die schönen Dinge des Lebens: das erste Lächeln, das erste Stehen, die ersten Schritte …",
-        "Behalte die kleinen Aufgaben im Blick und den Kopf frei für große Momente: das erste Wort, ein stolzes Grinsen und eine feste Umarmung.",
-        "Hier finden eure Aufgaben ihren Platz. So bleibt mehr Raum für Bilderbuchabenteuer, Pfützensprünge und gemeinsames Lachen.",
-        "Manches muss erledigt werden. Halte es hier fest und genieße die Momente dazwischen: Kuscheln am Morgen, Quatsch am Tisch und ein Gute-Nacht-Küsschen.",
-        "Teilt euch die Aufgaben und sammelt gemeinsam Erinnerungen: an kleine Entdeckungen, mutige Schritte und all die schönen ersten Male.",
-    )
+private val taskEncouragements
+    get() =
+        listOf(
+            text(TextKey.MANAGE_THE_TASKS_THAT_NEED_DOING_AND_MAKE_ROOM_IN_YOUR_MIND_FOR_LIFE_S_L),
+            text(TextKey.KEEP_THE_LITTLE_TASKS_IN_SIGHT_AND_YOUR_MIND_FREE_FOR_BIG_MOMENTS_A_FIRS),
+            text(TextKey.YOUR_TASKS_HAVE_A_HOME_HERE_LEAVE_MORE_ROOM_FOR_PICTURE_BOOK_ADVENTURES),
+            text(TextKey.SOME_THINGS_NEED_DOING_KEEP_THEM_HERE_AND_ENJOY_THE_MOMENTS_IN_BETWEEN_M),
+            text(TextKey.SHARE_THE_TASKS_AND_COLLECT_MEMORIES_TOGETHER_LITTLE_DISCOVERIES_BRAVE_S),
+        )
 
-private val appointmentEncouragements =
-    listOf(
-        "Behalte eure Termine im Blick und den Kopf frei für die schönen Dinge des Lebens: kleine Entdeckungen, große Umarmungen und gemeinsame Abenteuer.",
-        "Hier finden eure Termine ihren Platz. So bleibt mehr Raum für spontane Spielplatzbesuche, Pfützensprünge und ein Eis auf dem Heimweg.",
-        "Vom Kinderarzt bis zum Familienausflug: Plant, was euch wichtig ist, und freut euch auf die kleinen Glücksmomente dazwischen.",
-        "Ein guter Überblick macht den Alltag leichter. So könnt ihr beim Vorlesen, Kuscheln und gemeinsamen Lachen ganz bei euren Kindern sein.",
-        "Haltet eure Verabredungen hier fest und sammelt unterwegs Erinnerungen: an neue Freunde, mutige erste Male und schöne Stunden zusammen.",
-    )
+private val appointmentEncouragements
+    get() =
+        listOf(
+            text(TextKey.KEEP_YOUR_APPOINTMENTS_IN_SIGHT_AND_YOUR_MIND_FREE_FOR_LIFE_S_LOVELY_THI),
+            text(TextKey.YOUR_APPOINTMENTS_HAVE_A_HOME_HERE_LEAVE_MORE_ROOM_FOR_SPONTANEOUS_PLAYG),
+            text(TextKey.FROM_THE_PAEDIATRICIAN_TO_A_FAMILY_TRIP_PLAN_WHAT_MATTERS_TO_YOU_AND_ENJ),
+            text(TextKey.A_CLEAR_OVERVIEW_MAKES_EVERYDAY_LIFE_EASIER_SO_YOU_CAN_BE_FULLY_THERE_FO),
+            text(TextKey.KEEP_YOUR_PLANS_HERE_AND_COLLECT_MEMORIES_ALONG_THE_WAY_NEW_FRIENDS_BRAV),
+        )
 
 @Preview(name = "Heute", showBackground = true, widthDp = 390, heightDp = 820)
 @Composable
@@ -113,7 +119,7 @@ private fun TagesgartenPreview() {
                         AppointmentSeries(
                             "preview-appointment",
                             AppointmentDetails(
-                                "Kinderarzt",
+                                text(TextKey.PAEDIATRICIAN),
                                 AppointmentRecipient.JOHANN,
                                 date,
                                 LocalTime.of(9, 0),
@@ -198,6 +204,9 @@ fun KinderApp(
     val taskSaveError by vm.taskError.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val snack = remember { SnackbarHostState() }
+    val localeTags =
+        androidx.compose.ui.platform.LocalConfiguration.current.locales.toLanguageTags()
+    LaunchedEffect(localeTags) { vm.refreshPresentation() }
     LaunchedEffect(message) {
         message?.let {
             snack.showSnackbar(it)
@@ -217,36 +226,49 @@ fun KinderApp(
                     fontWeight = FontWeight.Bold,
                 )
                 AppBanner(
-                    "Zusammen wächst der Alltag.",
-                    "Für Ferdinand und Johann – und für euch beide.",
+                    text(TextKey.EVERYDAY_LIFE_GROWS_TOGETHER),
+                    text(TextKey.FOR_FERDINAND_AND_JOHANN_AND_FOR_BOTH_OF_YOU),
                 )
                 Text(
-                    "Kleine Aufgaben. Gemeinsam im Blick.",
+                    text(TextKey.LITTLE_TASKS_IN_SIGHT_TOGETHER),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 if (incoming.current != null)
                     Text(
-                        "Ein Kalenderimport wartet. Bitte zuerst anmelden und den Familienzugang freischalten."
+                        text(
+                            TextKey
+                                .A_CALENDAR_IMPORT_IS_WAITING_PLEASE_SIGN_IN_AND_ENABLE_FAMILY_ACCESS_FIR
+                        )
                     )
                 incoming.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 if (state.uid == null) {
                     Button(onClick = onSignIn, enabled = !signingIn) {
-                        Text(if (signingIn) "Anmelden …" else "Mit Google anmelden")
+                        Text(
+                            if (signingIn) text(TextKey.SIGNING_IN)
+                            else text(TextKey.SIGN_IN_WITH_GOOGLE)
+                        )
                     }
                     loginError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 } else {
                     Text(
-                        "Hallo ${state.name}. Dein Familienzugang muss noch freigeschaltet werden. Diese Nutzer-ID wird dafür benötigt:"
+                        text(
+                            TextKey
+                                .HELLO_YOUR_FAMILY_ACCESS_NEEDS_TO_BE_ENABLED_THIS_USER_ID_IS_REQUIRED,
+                            state.name,
+                        )
                     )
                     androidx.compose.foundation.text.selection.SelectionContainer {
                         Text(state.uid.orEmpty())
                     }
                     Text(
-                        "Die Einrichtung ist in docs/SETUP.md beschrieben. Nach der Freischaltung öffnet sich die Checkliste automatisch."
+                        text(
+                            TextKey
+                                .SETUP_IS_DESCRIBED_IN_DOCS_SETUP_MD_THE_CHECKLIST_OPENS_AUTOMATICALLY_ON
+                        )
                     )
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    TextButton(onClick = vm::retrySync) { Text("Erneut versuchen") }
-                    TextButton(onClick = onSignOut) { Text("Abmelden") }
+                    TextButton(onClick = vm::retrySync) { Text(text(TextKey.TRY_AGAIN)) }
+                    TextButton(onClick = onSignOut) { Text(text(TextKey.SIGN_OUT)) }
                 }
             }
         }
@@ -321,7 +343,7 @@ fun KinderApp(
                         openedInitial = true
                     }
                 if (!openedInitial && state.loaded) {
-                    snack.showSnackbar("Dieser Termin wurde geändert oder abgesagt.")
+                    snack.showSnackbar(text(TextKey.THIS_APPOINTMENT_HAS_CHANGED_OR_BEEN_CANCELLED))
                     openedInitial = true
                 }
             } else
@@ -389,7 +411,7 @@ fun KinderApp(
                                     onClick = { moreMenuExpanded = !moreMenuExpanded },
                                     modifier =
                                         Modifier.semantics {
-                                            contentDescription = "Weitere Seiten öffnen"
+                                            contentDescription = text(TextKey.OPEN_MORE_PAGES)
                                         },
                                 ) {
                                     AppIllustration(IllustrationRole.BRAND, Modifier.size(34.dp))
@@ -399,7 +421,7 @@ fun KinderApp(
                                     onDismissRequest = { moreMenuExpanded = false },
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("Geschenkideen") },
+                                        text = { Text(text(TextKey.GIFT_IDEAS)) },
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Default.CardGiftcard,
@@ -415,7 +437,7 @@ fun KinderApp(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Verlauf") },
+                                        text = { Text(text(TextKey.HISTORY)) },
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Default.History,
@@ -429,7 +451,7 @@ fun KinderApp(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Statistik") },
+                                        text = { Text(text(TextKey.STATISTICS)) },
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Default.BarChart,
@@ -443,7 +465,7 @@ fun KinderApp(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Papierkorb") },
+                                        text = { Text(text(TextKey.TRASH)) },
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Default.DeleteOutline,
@@ -475,7 +497,7 @@ fun KinderApp(
                                     tab = lastPrimaryPage
                                 }
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück")
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, text(TextKey.BACK))
                             }
                     },
                     actions = {
@@ -485,7 +507,7 @@ fun KinderApp(
                                 tab = AppPage.SETTINGS
                             }
                         ) {
-                            Icon(Icons.Default.Settings, "Einstellungen")
+                            Icon(Icons.Default.Settings, text(TextKey.SETTINGS))
                         }
                     },
                 )
@@ -539,29 +561,31 @@ fun KinderApp(
                             Modifier.width(homeButtonsWidth),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            YellowAddButton("Aufgabe", Modifier.weight(1f)) {
+                            YellowAddButton(text(TextKey.TASK), Modifier.weight(1f)) {
                                 editing = null
                                 taskEditSelection = null
                                 editorOpen = true
                             }
-                            YellowAddButton("Termin", Modifier.weight(1f)) {
+                            YellowAddButton(text(TextKey.APPOINTMENT), Modifier.weight(1f)) {
                                 appointmentUi.editor = AppointmentEditTarget(null)
                             }
                         }
                     AppPage.TASKS ->
-                        YellowAddButton("Aufgabe") {
+                        YellowAddButton(text(TextKey.TASK)) {
                             editing = null
                             taskEditSelection = null
                             editorOpen = true
                         }
                     AppPage.APPOINTMENTS ->
-                        YellowAddButton("Termin") {
+                        YellowAddButton(text(TextKey.APPOINTMENT)) {
                             appointmentUi.editor = AppointmentEditTarget(null)
                         }
                     AppPage.SHOPPING ->
-                        YellowAddButton("Einkauf") { vm.listUi.voiceImportOpen = true }
+                        YellowAddButton(text(TextKey.SHOPPING_ITEM)) {
+                            vm.listUi.voiceImportOpen = true
+                        }
                     AppPage.GIFTS ->
-                        YellowAddButton("Geschenkidee") {
+                        YellowAddButton(text(TextKey.GIFT_IDEA)) {
                             vm.listUi.editor = ListEditTarget(FamilyListKind.GIFTS)
                         }
                     else -> Unit
@@ -577,13 +601,13 @@ fun KinderApp(
                     ) {
                         Text(
                             state.error
-                                ?: if (state.pending) "Änderungen werden synchronisiert …"
-                                else "Gespeicherter Stand · Verbindung wird hergestellt",
+                                ?: if (state.pending) text(TextKey.SYNCHRONIZING_CHANGES)
+                                else text(TextKey.SAVED_DATA_CONNECTING),
                             style = MaterialTheme.typography.bodySmall,
                         )
                         if (state.error != null)
                             TextButton(onClick = vm::retrySync, enabled = !busy) {
-                                Text("Erneut versuchen")
+                                Text(text(TextKey.TRY_AGAIN))
                             }
                     }
                 }
@@ -594,7 +618,9 @@ fun KinderApp(
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                         )
-                        TextButton(onClick = inbox::dismissError) { Text("Hinweis schließen") }
+                        TextButton(onClick = inbox::dismissError) {
+                            Text(text(TextKey.DISMISS_NOTICE))
+                        }
                     }
                 }
                 if (incoming.current != null)
@@ -603,7 +629,12 @@ fun KinderApp(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            "${incoming.remaining} ${if (incoming.remaining == 1) "Termin" else "Termine"} zum Übernehmen",
+                            text(
+                                TextKey.TO_ADD,
+                                incoming.remaining,
+                                if (incoming.remaining == 1) text(TextKey.APPOINTMENT)
+                                else text(TextKey.APPOINTMENTS),
+                            ),
                             Modifier.weight(1f),
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -620,10 +651,10 @@ fun KinderApp(
                                 openedImportKey = incoming.key
                             }
                         ) {
-                            Text("Prüfen")
+                            Text(text(TextKey.REVIEW))
                         }
                         TextButton(onClick = { incoming.key?.let { inbox.consume(it) } }) {
-                            Text("Überspringen")
+                            Text(text(TextKey.SKIP))
                         }
                     }
                 if (
@@ -642,7 +673,7 @@ fun KinderApp(
                                 onlyMine = !onlyMine
                                 taskPage = 0
                             },
-                            label = { Text("Nur meine") },
+                            label = { Text(text(TextKey.ONLY_MINE)) },
                         )
                         VerticalDivider(Modifier.height(24.dp))
                         FilterChip(
@@ -651,7 +682,7 @@ fun KinderApp(
                                 selectedChild = null
                                 taskPage = 0
                             },
-                            label = { Text("Alle") },
+                            label = { Text(text(TextKey.ALL)) },
                         )
                         state.sections.forEach { child ->
                             AppChildChip(child, selectedChild == child.id) {
@@ -1019,7 +1050,7 @@ internal fun Checklist(
         if (onSelectDate == null)
             item {
                 Text(
-                    "Verlauf",
+                    text(TextKey.HISTORY),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
@@ -1054,7 +1085,7 @@ internal fun Checklist(
                             ) {
                                 Icon(
                                     Icons.Default.ChevronLeft,
-                                    "Vorheriger Tag",
+                                    text(TextKey.PREVIOUS_DAY),
                                     modifier = Modifier.size(28.dp),
                                 )
                             }
@@ -1077,7 +1108,7 @@ internal fun Checklist(
                             ) {
                                 Icon(
                                     Icons.Default.ChevronRight,
-                                    "Nächster Tag",
+                                    text(TextKey.NEXT_DAY),
                                     modifier = Modifier.size(28.dp),
                                 )
                             }
@@ -1091,7 +1122,7 @@ internal fun Checklist(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Text(
-                                "$done von ${due.size} Aufgaben erledigt",
+                                quantity(QuantityKey.TASK_PROGRESS, due.size, done, due.size),
                                 color = green,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
@@ -1107,7 +1138,12 @@ internal fun Checklist(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Text(
-                                "$appointmentsFinished von ${appointments.size} Termine absolviert",
+                                quantity(
+                                    QuantityKey.APPOINTMENT_PROGRESS,
+                                    appointments.size,
+                                    appointmentsFinished,
+                                    appointments.size,
+                                ),
                                 color = AppTheme.colors.primary,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
@@ -1123,7 +1159,7 @@ internal fun Checklist(
                             onClick = { onSelectDate(today) },
                             modifier = Modifier.align(Alignment.End),
                         ) {
-                            Text("Zurück zu heute")
+                            Text(text(TextKey.BACK_TO_TODAY))
                         }
                     }
                 }
@@ -1132,7 +1168,7 @@ internal fun Checklist(
         if (showTasks) {
             item {
                 Text(
-                    "Aufgaben",
+                    text(TextKey.TASKS),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
@@ -1141,8 +1177,8 @@ internal fun Checklist(
                 item {
                     EmptyCard(
                         if (upcomingTaskLimit > 0 || pastTaskDays > 0)
-                            "Für diesen Tag und den gewählten Zeitraum stehen keine Aufgaben an."
-                        else "Für diesen Tag stehen keine Aufgaben an."
+                            text(TextKey.THERE_ARE_NO_TASKS_FOR_THIS_DAY_AND_THE_SELECTED_PERIOD)
+                        else text(TextKey.THERE_ARE_NO_TASKS_FOR_THIS_DAY)
                     )
                 }
         }
@@ -1197,7 +1233,8 @@ internal fun Checklist(
                                     Icon(
                                         if (completed.isEmpty()) Icons.Default.Schedule
                                         else Icons.Default.CheckCircle,
-                                        if (completed.isEmpty()) "Nicht bestätigt" else "Bestätigt",
+                                        if (completed.isEmpty()) text(TextKey.NOT_CONFIRMED)
+                                        else text(TextKey.CONFIRMED),
                                         tint =
                                             if (completed.isEmpty()) childColor(child) else green,
                                         modifier = Modifier.padding(10.dp).size(24.dp),
@@ -1220,15 +1257,21 @@ internal fun Checklist(
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                     Text(
-                                        "Zuständig: ${responsibilityName(occurrence.revision.responsibleParentId, state.parents)}",
+                                        text(
+                                            TextKey.ASSIGNED_TO_C1E2EE,
+                                            responsibilityName(
+                                                occurrence.revision.responsibleParentId,
+                                                state.parents,
+                                            ),
+                                        ),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                     Text(
                                         if (completed.isEmpty()) {
-                                            if (occurrence.date > date) "Geplant"
-                                            else if (occurrence.date < date) "Überfällig"
-                                            else if (date < today) "Nicht bestätigt"
-                                            else "Noch offen"
+                                            if (occurrence.date > date) text(TextKey.PLANNED)
+                                            else if (occurrence.date < date) text(TextKey.OVERDUE)
+                                            else if (date < today) text(TextKey.NOT_CONFIRMED)
+                                            else text(TextKey.STILL_OPEN)
                                         } else
                                             completed.joinToString(" · ") {
                                                 completionText(it, formats)
@@ -1244,13 +1287,13 @@ internal fun Checklist(
         if (showAppointments) {
             item {
                 Text(
-                    "Termine",
+                    text(TextKey.APPOINTMENTS),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
             }
             if (appointments.isEmpty())
-                item { EmptyCard("Für diesen Tag stehen keine Termine an.") }
+                item { EmptyCard(text(TextKey.THERE_ARE_NO_APPOINTMENTS_FOR_THIS_DAY)) }
             items(appointments, key = { it.id }) {
                 AppointmentCard(it, state) { onOpenAppointment(it) }
             }
@@ -1289,7 +1332,7 @@ private fun DayProgressBar(progress: Float, color: Color) {
 }
 
 private fun completionText(event: CareEvent, formats: DateTimeFormats): String =
-    "${event.completedByName ?: event.authorName}${if (event.completedById != null && event.completedById != event.authorId) " · eingetragen von ${event.authorName}" else ""} · ${formats.timestamp(Instant.ofEpochMilli(event.clientMillis))}${if (event.pending) " · ausstehend" else ""}"
+    "${event.completedByName ?: event.authorName}${if (event.completedById != null && event.completedById != event.authorId) text(TextKey.RECORDED_BY, event.authorName) else ""} · ${formats.timestamp(Instant.ofEpochMilli(event.clientMillis))}${if (event.pending) text(TextKey.PENDING) else ""}"
 
 @Composable
 private fun EmptyCard(text: String) {
@@ -1415,15 +1458,15 @@ private fun TaskList(
         contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (showIntroduction) item { AppBanner("Euer Alltagshelfer", encouragement) }
+        if (showIntroduction) item { AppBanner(text(TextKey.YOUR_EVERYDAY_HELPER), encouragement) }
         if (showCalendar)
             item {
                 CalendarOverviewCard(
-                    "Aufgaben",
+                    text(TextKey.TASKS),
                     calendar,
                     today,
                     calendarPreviews,
-                    "Alle Aufgaben anzeigen",
+                    text(TextKey.SHOW_ALL_TASKS),
                     onCalendarChange,
                     AppTheme.colors.accent,
                 )
@@ -1432,8 +1475,8 @@ private fun TaskList(
             item {
                 EmptyCard(
                     if (selectedPeriod == null)
-                        "Keine anstehenden Aufgaben. Neue Aufgaben könnt ihr mit + Aufgabe anlegen."
-                    else "Keine Aufgaben im ausgewählten Zeitraum."
+                        text(TextKey.NO_UPCOMING_TASKS_ADD_NEW_TASKS_WITH_TASK)
+                    else text(TextKey.NO_TASKS_IN_THE_SELECTED_PERIOD)
                 )
             }
         if (paused.isNotEmpty() && selectedPeriod == null)
@@ -1445,8 +1488,8 @@ private fun TaskList(
                     }
                 ) {
                     Text(
-                        if (showPaused) "Pausierte Aufgaben ausblenden"
-                        else "Pausierte Aufgaben anzeigen (${paused.size})"
+                        if (showPaused) text(TextKey.HIDE_PAUSED_TASKS)
+                        else text(TextKey.SHOW_PAUSED_TASKS, paused.size)
                     )
                 }
             }
@@ -1459,7 +1502,7 @@ private fun TaskList(
                         (task.frequency == Frequency.ONCE && task.start < today))
             val child =
                 state.sections.firstOrNull { it.id == task.childId }
-                    ?: Child(task.childId, "Bereich")
+                    ?: Child(task.childId, text(TextKey.AREA))
             Card(
                 onClick = {
                     details =
@@ -1513,14 +1556,20 @@ private fun TaskList(
                             frequencyLabel(task.frequency, task.interval)
                     )
                     Text(
-                        "Zuständig: ${responsibilityName(task.responsibleParentId, state.parents)}",
+                        text(
+                            TextKey.ASSIGNED_TO_C1E2EE,
+                            responsibilityName(task.responsibleParentId, state.parents),
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     if (historical)
-                        Text("Vergangene Ausführung", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            text(TextKey.PAST_OCCURRENCE),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     else if (!editableTask.active)
                         Text(
-                            "Pausiert",
+                            text(TextKey.PAUSED),
                             color = AppTheme.colors.secondary,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -1529,15 +1578,15 @@ private fun TaskList(
         }
         item {
             PageNavigationCard(
-                "Aufgaben",
-                "${taskPage.first}–${taskPage.last} von ${taskPage.total}",
+                text(TextKey.TASKS),
+                text(TextKey.OF, taskPage.first, taskPage.last, taskPage.total),
                 canPrevious = taskPage.index > 0,
                 canNext = taskPage.hasNext,
                 onPrevious = { onPageChange(taskPage.index - 1) },
                 onNext = { onPageChange(taskPage.index + 1) },
-                previousDescription = "Vorherige 90 Aufgaben",
-                nextDescription = "Nächste 90 Aufgaben",
-                resetText = if (taskPage.index > 0) "Zu den ersten Aufgaben" else null,
+                previousDescription = text(TextKey.PREVIOUS_90_TASKS),
+                nextDescription = text(TextKey.NEXT_90_TASKS),
+                resetText = if (taskPage.index > 0) text(TextKey.FIRST_TASKS) else null,
                 onReset = { onPageChange(0) },
             )
         }
@@ -1571,9 +1620,9 @@ private fun TaskList(
     archive?.let { task ->
         AlertDialog(
             onDismissRequest = { archive = null },
-            title = { Text("Kommende Ausführungen pausieren?") },
+            title = { Text(text(TextKey.PAUSE_UPCOMING_OCCURRENCES)) },
             text = {
-                Text("„${task.title}“ bleibt im Verlauf. Ihr könnt die Aufgabe später fortsetzen.")
+                Text(text(TextKey.STAYS_IN_THE_HISTORY_YOU_CAN_RESUME_THE_TASK_LATER, task.title))
             },
             confirmButton = {
                 TextButton(
@@ -1582,21 +1631,26 @@ private fun TaskList(
                         archive = null
                     }
                 ) {
-                    Text("Pausieren")
+                    Text(text(TextKey.PAUSE))
                 }
             },
-            dismissButton = { TextButton(onClick = { archive = null }) { Text("Abbrechen") } },
+            dismissButton = {
+                TextButton(onClick = { archive = null }) { Text(text(TextKey.CANCEL)) }
+            },
         )
     }
 }
 
 internal fun frequencyLabel(frequency: Frequency, interval: Int = 1) =
     when (frequency) {
-        Frequency.ONCE -> "Einmalig"
-        Frequency.DAILY -> if (interval == 1) "Täglich" else "Alle $interval Tage"
-        Frequency.WEEKDAYS -> "An Wochentagen"
-        Frequency.WEEKS -> if (interval == 1) "Wöchentlich" else "Alle $interval Wochen"
-        Frequency.MONTHS -> if (interval == 1) "Monatlich" else "Alle $interval Monate"
+        Frequency.ONCE -> text(TextKey.ONE_OFF)
+        Frequency.DAILY ->
+            if (interval == 1) text(TextKey.DAILY) else text(TextKey.EVERY_DAYS, interval)
+        Frequency.WEEKDAYS -> text(TextKey.ON_WEEKDAYS)
+        Frequency.WEEKS ->
+            if (interval == 1) text(TextKey.WEEKLY) else text(TextKey.EVERY_WEEKS, interval)
+        Frequency.MONTHS ->
+            if (interval == 1) text(TextKey.MONTHLY) else text(TextKey.EVERY_MONTHS, interval)
     }
 
 @Composable
@@ -1628,7 +1682,7 @@ internal fun OccurrenceDialog(
     var completedById by rememberSaveable(occurrence.id) { mutableStateOf(state.uid) }
     ItemDetailsDialog(
         occurrence.revision.title,
-        "Aufgabe · Ausführung",
+        text(TextKey.TASK_OCCURRENCE),
         onDismiss,
         actions = {
             saveError?.let {
@@ -1647,7 +1701,7 @@ internal fun OccurrenceDialog(
                         )
                             add(
                                 DetailActionSpec(
-                                    "Bearbeiten",
+                                    text(TextKey.EDIT),
                                     Icons.Default.Edit,
                                     visible && !state.fromCache && state.error == null,
                                     onClick = onEdit,
@@ -1656,7 +1710,7 @@ internal fun OccurrenceDialog(
                     },
                 deleteAction =
                     DetailActionSpec(
-                        "Löschen",
+                        text(TextKey.DELETE),
                         Icons.Default.DeleteOutline,
                         visible && !state.fromCache && state.error == null,
                         onClick = onDelete,
@@ -1674,7 +1728,7 @@ internal fun OccurrenceDialog(
                         ) {
                             Icon(Icons.Default.Check, null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Als erledigt bestätigen")
+                            Text(text(TextKey.MARK_AS_COMPLETED))
                         }
                     else
                         OutlinedButton(
@@ -1689,58 +1743,66 @@ internal fun OccurrenceDialog(
                             },
                         ) {
                             Text(
-                                if (confirmingUndo) "Ja, Bestätigungen zurücknehmen"
-                                else "Bestätigung korrigieren"
+                                if (confirmingUndo) text(TextKey.YES_RETRACT_CONFIRMATIONS)
+                                else text(TextKey.CORRECT_CONFIRMATION)
                             )
                         }
                 },
             )
         },
     ) {
-        DetailSection("Auf einen Blick", AppTheme.colors.accentContainer) {
+        DetailSection(text(TextKey.AT_A_GLANCE), AppTheme.colors.accentContainer) {
             DetailValue(
                 Icons.Default.Face,
-                "Bereich",
+                text(TextKey.AREA),
                 state.sections.firstOrNull { it.id == occurrence.revision.childId }?.name
-                    ?: "Bereich",
+                    ?: text(TextKey.AREA),
             )
-            DetailValue(Icons.Default.Event, "Datum", formats.fullDate(occurrence.date))
-            DetailValue(Icons.Default.Schedule, "Uhrzeit", formats.time(occurrence.time))
+            DetailValue(Icons.Default.Event, text(TextKey.DATE), formats.fullDate(occurrence.date))
+            DetailValue(Icons.Default.Schedule, text(TextKey.TIME), formats.time(occurrence.time))
             DetailValue(
                 Icons.Default.Person,
-                "Zuständig",
+                text(TextKey.ASSIGNED_TO),
                 responsibilityName(occurrence.revision.responsibleParentId, state.parents),
             )
             DetailValue(
                 if (completed.isEmpty()) Icons.Default.RadioButtonUnchecked
                 else Icons.Default.CheckCircle,
-                "Status",
-                if (completed.isEmpty()) "Noch nicht bestätigt" else "Erledigt",
+                text(TextKey.STATUS),
+                if (completed.isEmpty()) text(TextKey.NOT_CONFIRMED_YET)
+                else text(TextKey.COMPLETED),
             )
         }
         TaskCompletionOverview(occurrence.revision.taskId, state, now, occurrence.date)
         if (occurrence.revision.notes.isNotBlank())
-            DetailSection("Notizen", AppTheme.colors.background) { Text(occurrence.revision.notes) }
+            DetailSection(text(TextKey.NOTES), AppTheme.colors.background) {
+                Text(occurrence.revision.notes)
+            }
         if (!visible)
             DetailNotice(
-                "Diese Ausführung wurde geändert, gelöscht oder verschoben. Bitte schließen und die Übersicht neu öffnen."
+                text(
+                    TextKey.THIS_OCCURRENCE_HAS_CHANGED_BEEN_DELETED_OR_MOVED_PLEASE_CLOSE_AND_REOPE
+                )
             )
         if (state.fromCache)
             DetailNotice(
-                "Gespeicherter Stand: Bestätigungen vom anderen Telefon sind möglicherweise noch nicht sichtbar."
+                text(TextKey.SAVED_DATA_CONFIRMATIONS_FROM_THE_OTHER_PHONE_MAY_NOT_BE_VISIBLE_YET)
             )
         if (completed.isEmpty()) {
             if (occurrence.instant > now)
                 Text(
-                    "Eine Bestätigung im Voraus zählt für diese Ausführung. Im Verlauf steht der jetzige Zeitpunkt.",
+                    text(
+                        TextKey
+                            .AN_EARLY_CONFIRMATION_COUNTS_FOR_THIS_OCCURRENCE_THE_HISTORY_RECORDS_THE
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                 )
             if (occurrence.date < today)
                 Text(
-                    "Eine nachträgliche Bestätigung zeichnet den jetzigen Zeitpunkt auf.",
+                    text(TextKey.A_LATE_CONFIRMATION_RECORDS_THE_CURRENT_TIME),
                     style = MaterialTheme.typography.bodySmall,
                 )
-            DetailSection("Erledigt von", AppTheme.colors.background) {
+            DetailSection(text(TextKey.COMPLETED_BY), AppTheme.colors.background) {
                 Column(
                     Modifier.selectableGroup(),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -1758,19 +1820,19 @@ internal fun OccurrenceDialog(
                         ) {
                             RadioButton(selected = completedById == parent.id, onClick = null)
                             Spacer(Modifier.width(8.dp))
-                            Text(parent.name + if (parent.id == state.uid) " (ich)" else "")
+                            Text(parent.name + if (parent.id == state.uid) text(TextKey.ME) else "")
                         }
                     }
                 }
             }
         }
         if (events.isNotEmpty())
-            DetailSection("Bestätigungen & Korrekturen", AppTheme.colors.background) {
+            DetailSection(text(TextKey.CONFIRMATIONS_CORRECTIONS), AppTheme.colors.background) {
                 events.forEachIndexed { index, event ->
                     if (index > 0) HorizontalDivider()
                     Text(
-                        if (event.kind == EventKind.COMPLETE) "Bestätigt"
-                        else "Bestätigung zurückgenommen",
+                        if (event.kind == EventKind.COMPLETE) text(TextKey.CONFIRMED)
+                        else text(TextKey.CONFIRMATION_RETRACTED),
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -1780,14 +1842,19 @@ internal fun OccurrenceDialog(
                             event.serverMillis - event.clientMillis > 60_000
                     )
                         Text(
-                            "Synchronisiert: ${formats.timestamp(Instant.ofEpochMilli(event.serverMillis))}",
+                            text(
+                                TextKey.SYNCHRONIZED,
+                                formats.timestamp(Instant.ofEpochMilli(event.serverMillis)),
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                         )
                 }
             }
         if (confirmingUndo)
             DetailNotice(
-                "Alle aktuellen Bestätigungen für diese Ausführung zurücknehmen? Die Korrektur bleibt im Verlauf sichtbar."
+                text(
+                    TextKey.RETRACT_ALL_CURRENT_CONFIRMATIONS_FOR_THIS_OCCURRENCE_THE_CORRECTION_REM
+                )
             )
     }
 }
@@ -1902,11 +1969,15 @@ private fun Settings(
         item {
             AppBanner(
                 AppTheme.definition.settingsTitle,
-                "Alles, was euren Kinderalltag persönlich macht.",
+                text(TextKey.EVERYTHING_THAT_MAKES_YOUR_FAMILY_DAY_YOUR_OWN),
             )
         }
         item {
-            SettingsSection("Dein Konto", Icons.Default.AccountCircle, AppTheme.colors.accent) {
+            SettingsSection(
+                text(TextKey.YOUR_ACCOUNT),
+                Icons.Default.AccountCircle,
+                AppTheme.colors.accent,
+            ) {
                 Text(
                     state.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -1914,42 +1985,51 @@ private fun Settings(
                 )
                 Text(
                     state.error
-                        ?: if (state.pending) "Änderungen werden synchronisiert …"
-                        else if (state.fromCache) "Gespeicherter Stand"
-                        else "Alles auf dem aktuellen Stand.",
+                        ?: if (state.pending) text(TextKey.SYNCHRONIZING_CHANGES)
+                        else if (state.fromCache) text(TextKey.SAVED_DATA)
+                        else text(TextKey.EVERYTHING_IS_UP_TO_DATE),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedButton(onClick = vm::retrySync, enabled = !busy) {
                     Icon(Icons.Default.Sync, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Jetzt synchronisieren")
+                    Text(text(TextKey.SYNCHRONIZE_NOW))
                 }
             }
         }
         item {
-            SettingsSection("Darstellung", Icons.Default.Palette, AppTheme.colors.deepAccent) {
+            SettingsSection(
+                text(TextKey.APPEARANCE),
+                Icons.Default.Palette,
+                AppTheme.colors.deepAccent,
+            ) {
+                LanguagePicker(vm::clearTransientMessages)
+                HorizontalDivider()
                 ThemePicker()
                 HorizontalDivider()
                 SettingsToggle(
-                    "Alltagsgedanken anzeigen",
-                    "Zeigt die wechselnden Texte in Aufgaben, Termine, Einkaufsliste und Geschenkideen.",
+                    text(TextKey.SHOW_DAILY_THOUGHTS),
+                    text(
+                        TextKey
+                            .SHOWS_ROTATING_MESSAGES_IN_TASKS_APPOINTMENTS_SHOPPING_LIST_AND_GIFT_IDE
+                    ),
                     showIntroductions,
                     onShowIntroductionsChange,
                 )
                 HorizontalDivider()
                 SettingsToggle(
-                    "Kalenderansicht anzeigen",
-                    "Zeigt den Kalender in Aufgaben und Termine.",
+                    text(TextKey.SHOW_CALENDAR_VIEW),
+                    text(TextKey.SHOWS_THE_CALENDAR_IN_TASKS_AND_APPOINTMENTS),
                     showCalendars,
                     onShowCalendarsChange,
                 )
             }
         }
         item {
-            SettingsSection("Startseite", Icons.Default.Home, AppTheme.colors.accent) {
+            SettingsSection(text(TextKey.HOME), Icons.Default.Home, AppTheme.colors.accent) {
                 SettingsToggle(
-                    "Vergangene Aufgaben anzeigen",
-                    "Zeigt noch offene Aufgaben aus vergangenen Tagen auf der Startseite.",
+                    text(TextKey.SHOW_PAST_TASKS),
+                    text(TextKey.SHOWS_OPEN_TASKS_FROM_PAST_DAYS_ON_HOME),
                     showPastTasks,
                     onShowPastTasksChange,
                 )
@@ -1966,21 +2046,24 @@ private fun Settings(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Vergangene Aufgaben in Tagen") },
-                        supportingText = { Text("1 bis 365 Tage · Standard: 7") },
+                        label = { Text(text(TextKey.PAST_TASKS_IN_DAYS)) },
+                        supportingText = { Text(text(TextKey.VALUE_1_TO_365_DAYS_DEFAULT_7)) },
                         isError = pastDaysText.toIntOrNull()?.let { it !in 1..365 } ?: true,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
                     Text(
-                        "Offene einmalige Aufgaben bleiben im gewählten Zeitraum sichtbar. Bei wiederkehrenden Aufgaben ersetzt die nächste fällige Ausführung die vorherige.",
+                        text(
+                            TextKey
+                                .OPEN_ONE_OFF_TASKS_STAY_VISIBLE_FOR_THE_SELECTED_PERIOD_FOR_RECURRING_TA
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 HorizontalDivider()
                 SettingsToggle(
-                    "Kommende Aufgaben anzeigen",
-                    "Zeigt künftige Ausführungen direkt bei den Aufgaben des gewählten Tages.",
+                    text(TextKey.SHOW_UPCOMING_TASKS),
+                    text(TextKey.SHOWS_FUTURE_OCCURRENCES_WITH_THE_TASKS_OF_THE_SELECTED_DAY),
                     showUpcomingTasks,
                     onShowUpcomingTasksChange,
                 )
@@ -1998,24 +2081,29 @@ private fun Settings(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Vorschau in Tagen") },
+                        label = { Text(text(TextKey.PREVIEW_IN_DAYS)) },
                         supportingText = {
-                            Text("1 bis 365 Tage nach dem angezeigten Tag · Standard: 7")
+                            Text(
+                                text(TextKey.VALUE_1_TO_365_DAYS_AFTER_THE_DISPLAYED_DAY_DEFAULT_7)
+                            )
                         },
                         isError = upcomingDaysText.toIntOrNull()?.let { it !in 1..365 } ?: true,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
                     Text(
-                        "Je Aufgabe wird nur die nächste offene Ausführung angezeigt.",
+                        text(TextKey.ONLY_THE_NEXT_OPEN_OCCURRENCE_OF_EACH_TASK_IS_SHOWN),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     HorizontalDivider()
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("Anzahl der Aufgaben", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "1 bis 50 · auf diesem Gerät",
+                                text(TextKey.NUMBER_OF_TASKS),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                text(TextKey.VALUE_1_TO_50_ON_THIS_DEVICE),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -2023,7 +2111,7 @@ private fun Settings(
                             onClick = { onUpcomingTaskCountChange(upcomingTaskCount - 1) },
                             enabled = upcomingTaskCount > 1,
                         ) {
-                            Icon(Icons.Default.Remove, "Weniger kommende Aufgaben")
+                            Icon(Icons.Default.Remove, text(TextKey.FEWER_UPCOMING_TASKS))
                         }
                         Text(
                             upcomingTaskCount.toString(),
@@ -2033,7 +2121,7 @@ private fun Settings(
                             onClick = { onUpcomingTaskCountChange(upcomingTaskCount + 1) },
                             enabled = upcomingTaskCount < 50,
                         ) {
-                            Icon(Icons.Default.Add, "Mehr kommende Aufgaben")
+                            Icon(Icons.Default.Add, text(TextKey.MORE_UPCOMING_TASKS))
                         }
                     }
                 }
@@ -2042,41 +2130,50 @@ private fun Settings(
         item { ListLabelSettings(state, vm, busy) }
         item {
             SettingsSection(
-                "Benachrichtigungen",
+                text(TextKey.NOTIFICATIONS),
                 Icons.Default.Notifications,
                 AppTheme.colors.primary,
             ) {
                 SettingsToggle(
-                    "Erinnerungen",
-                    "An deine fälligen Aufgaben und Termine – auch bei Zuständigkeit für beide Eltern.",
+                    text(TextKey.REMINDERS),
+                    text(
+                        TextKey
+                            .REMINDERS_FOR_YOUR_DUE_TASKS_AND_APPOINTMENTS_INCLUDING_THOSE_ASSIGNED_T
+                    ),
                     enabled,
                 ) {
                     changeNotificationChoice("reminders", it)
                 }
                 HorizontalDivider()
                 SettingsToggle(
-                    "Neue Aufgaben",
-                    "Wenn der andere Elternteil eine Aufgabe anlegt.",
+                    text(TextKey.NEW_TASKS),
+                    text(TextKey.WHEN_THE_OTHER_PARENT_ADDS_A_TASK),
                     newTasks,
                 ) {
                     changeNotificationChoice("tasks", it)
                 }
                 SettingsToggle(
-                    "Aufgabe erledigt",
-                    "Wenn der andere Elternteil eine offene Aufgabe bestätigt – solange Kinderalltag läuft.",
+                    text(TextKey.TASK_COMPLETED),
+                    text(
+                        TextKey
+                            .WHEN_THE_OTHER_PARENT_CONFIRMS_AN_OPEN_TASK_WHILE_KINDERALLTAG_IS_RUNNIN
+                    ),
                     taskCompletions,
                 ) {
                     changeNotificationChoice("completions", it)
                 }
                 SettingsToggle(
-                    "Neue Termine",
-                    "Wenn der andere Elternteil einen Termin anlegt.",
+                    text(TextKey.NEW_APPOINTMENTS),
+                    text(TextKey.WHEN_THE_OTHER_PARENT_ADDS_AN_APPOINTMENT),
                     newAppointments,
                 ) {
                     changeNotificationChoice("appointments", it)
                 }
                 Text(
-                    "Neuigkeiten werden empfangen, solange die App läuft und verbunden ist. Bei geschlossener App gibt es dafür noch keine Push-Mitteilungen.",
+                    text(
+                        TextKey
+                            .UPDATES_ARRIVE_WHILE_THE_APP_IS_RUNNING_AND_CONNECTED_PUSH_NOTIFICATIONS
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 TextButton(
@@ -2091,18 +2188,22 @@ private fun Settings(
                         )
                     }
                 ) {
-                    Text("Android-Benachrichtigungen verwalten")
+                    Text(text(TextKey.MANAGE_ANDROID_NOTIFICATIONS))
                 }
                 Text(
-                    "Diese Einstellungen gelten für dieses Telefon. Android kann die Zustellung verzögern.",
+                    text(TextKey.THESE_SETTINGS_APPLY_TO_THIS_PHONE_ANDROID_MAY_DELAY_DELIVERY),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
         item {
-            SettingsSection("Eure Kinder", Icons.Default.ChildCare, AppTheme.colors.secondary) {
+            SettingsSection(
+                text(TextKey.YOUR_CHILDREN),
+                Icons.Default.ChildCare,
+                AppTheme.colors.secondary,
+            ) {
                 Text(
-                    "Ein eigener Bär und eine Lieblingsfarbe für jedes Kind.",
+                    text(TextKey.A_BEAR_AND_A_FAVOURITE_COLOUR_FOR_EACH_CHILD),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 state.children.forEach { child ->
@@ -2125,7 +2226,10 @@ private fun Settings(
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             Text(child.name, fontWeight = FontWeight.Bold)
-                            Text("Name & Bärenfarbe", style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                text(TextKey.NAME_BEAR_COLOUR),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
                         Icon(Icons.Default.Edit, null, Modifier.size(20.dp))
                     }
@@ -2134,35 +2238,41 @@ private fun Settings(
         }
         item {
             SettingsSection(
-                "Euer Tagesrhythmus",
+                text(TextKey.YOUR_DAILY_RHYTHM),
                 Icons.Default.WbSunny,
                 AppTheme.colors.deepAccent,
             ) {
-                Text("Familienzeitzone: Europe/Berlin", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Tageswechsel und Erinnerungen richten sich auch auf Reisen nach eurer Familienzeit.",
+                    text(TextKey.FAMILY_TIMEZONE_EUROPE_BERLIN),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text(
+                        TextKey
+                            .DAY_BOUNDARIES_AND_REMINDERS_FOLLOW_YOUR_FAMILY_TIMEZONE_EVEN_WHEN_TRAVE
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
         item {
             SettingsSection(
-                "Über Kinderalltag",
+                text(TextKey.ABOUT_KINDERALLTAG),
                 Icons.Default.Favorite,
                 AppTheme.colors.secondary,
             ) {
                 Text(
-                    "Ein gemeinsamer Blick auf die kleinen und großen Aufgaben eurer Familie.",
+                    text(TextKey.A_SHARED_VIEW_OF_YOUR_FAMILY_S_SMALL_AND_BIG_TASKS),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Text("Version $version", style = MaterialTheme.typography.bodySmall)
+                Text(text(TextKey.VERSION, version), style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(
                     onClick = { showImpressum = true },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Default.Info, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Impressum")
+                    Text(text(TextKey.LEGAL_NOTICE))
                 }
             }
         }
@@ -2174,13 +2284,13 @@ private fun Settings(
             ) {
                 Icon(Icons.AutoMirrored.Filled.Logout, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Abmelden")
+                Text(text(TextKey.SIGN_OUT))
             }
         }
         if (state.pending)
             item {
                 Text(
-                    "Vor dem Abmelden bitte ausstehende Änderungen synchronisieren.",
+                    text(TextKey.PLEASE_SYNCHRONIZE_PENDING_CHANGES_BEFORE_SIGNING_OUT),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -2190,7 +2300,7 @@ private fun Settings(
     rename?.let { child ->
         AlertDialog(
             onDismissRequest = { if (!busy) rename = null },
-            title = { Text("Kinderprofil") },
+            title = { Text(text(TextKey.CHILD_PROFILE)) },
             text = {
                 Column(
                     Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
@@ -2199,7 +2309,7 @@ private fun Settings(
                     OutlinedTextField(
                         name,
                         { name = it },
-                        label = { Text("Name") },
+                        label = { Text(text(TextKey.NAME)) },
                         singleLine = true,
                         enabled = !busy,
                     )
@@ -2208,7 +2318,10 @@ private fun Settings(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         ChildIcon(child.copy(bearColor = bearColor), Modifier.size(72.dp))
-                        Text("Bärenfarbe", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text(TextKey.BEAR_COLOUR),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                     }
                     Column(
                         Modifier.selectableGroup(),
@@ -2275,11 +2388,13 @@ private fun Settings(
                     },
                     enabled = !busy && !state.fromCache && name.isNotBlank() && name.length <= 60,
                 ) {
-                    Text(if (busy) "Speichert …" else "Speichern")
+                    Text(if (busy) text(TextKey.SAVING) else text(TextKey.SAVE))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { rename = null }, enabled = !busy) { Text("Abbrechen") }
+                TextButton(onClick = { rename = null }, enabled = !busy) {
+                    Text(text(TextKey.CANCEL))
+                }
             },
         )
     }
@@ -2287,12 +2402,12 @@ private fun Settings(
 
 private fun bearColorLabel(color: BearColor) =
     when (color) {
-        BearColor.BLUE -> "Blau"
-        BearColor.ROSE -> "Rosa"
-        BearColor.GREEN -> "Grün"
-        BearColor.HONEY -> "Honig"
-        BearColor.BROWN -> "Braun"
-        BearColor.PURPLE -> "Lila"
+        BearColor.BLUE -> text(TextKey.BLUE)
+        BearColor.ROSE -> text(TextKey.PINK)
+        BearColor.GREEN -> text(TextKey.GREEN)
+        BearColor.HONEY -> text(TextKey.HONEY)
+        BearColor.BROWN -> text(TextKey.BROWN)
+        BearColor.PURPLE -> text(TextKey.PURPLE)
     }
 
 @Composable
@@ -2356,11 +2471,14 @@ private fun TaskEditor(
             Column(Modifier.safeDrawingPadding().imePadding()) {
                 TopAppBar(
                     title = {
-                        Text(if (existing == null) "Neue Aufgabe" else "Aufgabe bearbeiten")
+                        Text(
+                            if (existing == null) text(TextKey.NEW_TASK)
+                            else text(TextKey.EDIT_TASK)
+                        )
                     },
                     navigationIcon = {
                         IconButton(onClick = onDismiss, enabled = !busy) {
-                            Icon(Icons.Default.Close, "Schließen")
+                            Icon(Icons.Default.Close, text(TextKey.CLOSE))
                         }
                     },
                 )
@@ -2375,7 +2493,7 @@ private fun TaskEditor(
                         ) {
                             AppIllustration(IllustrationRole.HELPER, Modifier.size(56.dp))
                             Text(
-                                "Platz für einen kleinen Alltagshelfer.",
+                                text(TextKey.ROOM_FOR_A_LITTLE_EVERYDAY_HELPER),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = AppTheme.colors.primary,
                                 modifier = Modifier.weight(1f),
@@ -2385,20 +2503,25 @@ private fun TaskEditor(
                     if (existing != null)
                         item {
                             Text(
-                                "Änderung gilt für: ${if (single) "nur diese Ausführung" else "diese und alle folgenden"}. Bestätigungen und begonnene Wiederholungen bleiben erhalten. Für einzelne Ausführungen darf das neue Datum auch in der Vergangenheit liegen."
+                                text(
+                                    TextKey
+                                        .APPLIES_TO_CONFIRMATIONS_AND_STARTED_RECURRING_OCCURRENCES_ARE_PRESERVED,
+                                    if (single) text(TextKey.ONLY_THIS_OCCURRENCE_BEA118)
+                                    else text(TextKey.THIS_AND_ALL_FOLLOWING_OCCURRENCES_8EB5E8),
+                                )
                             )
                         }
                     item {
                         DictationField(
                             title,
                             { title = it },
-                            "Aufgabe",
+                            text(TextKey.TASK),
                             Modifier.fillMaxWidth(),
                             enabled = !busy,
                         )
                     }
                     item {
-                        Text("Für welchen Bereich?", style = MaterialTheme.typography.titleSmall)
+                        Text(text(TextKey.WHICH_AREA), style = MaterialTheme.typography.titleSmall)
                     }
                     item {
                         Row(
@@ -2415,13 +2538,15 @@ private fun TaskEditor(
                         DictationField(
                             notes,
                             { notes = it },
-                            "Notizen (optional)",
+                            text(TextKey.NOTES_OPTIONAL),
                             Modifier.fillMaxWidth(),
                             notes = true,
                             enabled = !busy,
                         )
                     }
-                    item { Text("Wiederholung", style = MaterialTheme.typography.titleSmall) }
+                    item {
+                        Text(text(TextKey.RECURRENCE), style = MaterialTheme.typography.titleSmall)
+                    }
                     if (!single)
                         items(Frequency.entries) { value ->
                             Row(
@@ -2431,9 +2556,9 @@ private fun TaskEditor(
                                 RadioButton(frequency == value, { frequency = value })
                                 Text(
                                     when (value) {
-                                        Frequency.DAILY -> "Tage"
-                                        Frequency.WEEKS -> "Wochen"
-                                        Frequency.MONTHS -> "Monate"
+                                        Frequency.DAILY -> text(TextKey.DAYS_E94F59)
+                                        Frequency.WEEKS -> text(TextKey.WEEKS)
+                                        Frequency.MONTHS -> text(TextKey.MONTHS)
                                         else -> frequencyLabel(value)
                                     }
                                 )
@@ -2450,13 +2575,13 @@ private fun TaskEditor(
                                     if (value.length <= 4 && value.all { it in '0'..'9' })
                                         intervalText = value
                                 },
-                                label = { Text("Alle") },
+                                label = { Text(text(TextKey.ALL)) },
                                 supportingText = {
                                     Text(
                                         when (frequency) {
-                                            Frequency.WEEKS -> "Wochen · 1 bis 1000"
-                                            Frequency.MONTHS -> "Monate · 1 bis 1000"
-                                            else -> "Tage · 1 bis 1000"
+                                            Frequency.WEEKS -> text(TextKey.WEEKS_1_TO_1000)
+                                            Frequency.MONTHS -> text(TextKey.MONTHS_1_TO_1000)
+                                            else -> text(TextKey.DAYS_1_TO_1000)
                                         }
                                     )
                                 },
@@ -2467,12 +2592,15 @@ private fun TaskEditor(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Text(
-                                "Das Startdatum bestimmt den Rhythmus.",
+                                text(TextKey.THE_START_DATE_DETERMINES_THE_RHYTHM),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             if (frequency == Frequency.MONTHS)
                                 Text(
-                                    "Gibt es den Tag in einem Monat nicht, gilt der letzte Tag des Monats.",
+                                    text(
+                                        TextKey
+                                            .IF_THE_DAY_DOES_NOT_EXIST_IN_A_MONTH_THE_LAST_DAY_OF_THE_MONTH_IS_USED
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                         }
@@ -2506,7 +2634,7 @@ private fun TaskEditor(
                     item {
                         if (single)
                             TimePickerField(
-                                "Uhrzeit",
+                                text(TextKey.TIME),
                                 times.single(),
                                 { times = listOf(it) },
                                 enabled = !busy,
@@ -2515,7 +2643,8 @@ private fun TaskEditor(
                     }
                     item {
                         DatePickerField(
-                            if (frequency == Frequency.ONCE) "Datum" else "Startdatum",
+                            if (frequency == Frequency.ONCE) text(TextKey.DATE)
+                            else text(TextKey.START_DATE),
                             start,
                             { it?.let { chosen -> start = chosen } },
                             enabled = !busy,
@@ -2528,7 +2657,7 @@ private fun TaskEditor(
                     if (frequency != Frequency.ONCE)
                         item {
                             DatePickerField(
-                                "Enddatum (optional)",
+                                text(TextKey.END_DATE_OPTIONAL),
                                 end,
                                 { end = it },
                                 optional = true,
@@ -2542,11 +2671,10 @@ private fun TaskEditor(
                         item {
                             Text(syncError, color = MaterialTheme.colorScheme.error)
                             TextButton(onClick = onRetrySync, enabled = !busy) {
-                                Text("Erneut versuchen")
+                                Text(text(TextKey.TRY_AGAIN))
                             }
                         }
-                    else if (offline)
-                        item { Text("Zum Bearbeiten ist eine Verbindung erforderlich.") }
+                    else if (offline) item { Text(text(TextKey.EDITING_REQUIRES_A_CONNECTION)) }
                     item {
                         Button(
                             enabled = !busy && !offline && children.isNotEmpty(),
@@ -2578,7 +2706,10 @@ private fun TaskEditor(
                                                 )
                                                     intervalText.toIntOrNull()
                                                         ?: throw IllegalArgumentException(
-                                                            "Bitte ein Intervall von 1 bis 1000 angeben."
+                                                            text(
+                                                                TextKey
+                                                                    .PLEASE_ENTER_AN_INTERVAL_FROM_1_TO_1000
+                                                            )
                                                         )
                                                 else 1,
                                         )
@@ -2588,22 +2719,27 @@ private fun TaskEditor(
                                             revision.frequency != Frequency.ONCE ||
                                             revision.start >= effective
                                     ) {
-                                        "Das Datum muss am oder nach dem Gültigkeitsbeginn liegen."
+                                        text(
+                                            TextKey
+                                                .THE_DATE_MUST_BE_ON_OR_AFTER_THE_EFFECTIVE_START_DATE
+                                        )
                                     }
-                                    require(existing != null || revision.start >= today) {
-                                        "Neue Aufgaben beginnen frühestens heute."
+                                    requireLocalized(existing != null || revision.start >= today) {
+                                        message(TextKey.NEW_TASKS_START_NO_EARLIER_THAN_TODAY)
                                     }
                                     require(revision.end == null || revision.end >= effective) {
-                                        "Das Enddatum liegt vor dem Gültigkeitsbeginn."
+                                        text(
+                                            TextKey.THE_END_DATE_IS_BEFORE_THE_EFFECTIVE_START_DATE
+                                        )
                                     }
                                     error = null
                                     onSave(revision)
                                 } catch (e: Exception) {
-                                    error = e.message ?: "Bitte Angaben prüfen."
+                                    error = e.message ?: text(TextKey.PLEASE_CHECK_YOUR_ENTRIES)
                                 }
                             },
                         ) {
-                            Text(if (busy) "Wird gespeichert …" else "Aufgabe speichern")
+                            Text(if (busy) text(TextKey.SAVING_6B432E) else text(TextKey.SAVE_TASK))
                         }
                     }
                 }

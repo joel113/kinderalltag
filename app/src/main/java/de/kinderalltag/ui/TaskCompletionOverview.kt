@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.kinderalltag.data.FamilyState
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -29,9 +30,9 @@ import java.time.format.DateTimeFormatter
 
 private fun trackerStatusLabel(status: TaskCompletionStatus) =
     when (status) {
-        TaskCompletionStatus.COMPLETED -> "Bestätigt"
-        TaskCompletionStatus.MISSING -> "Nicht bestätigt"
-        TaskCompletionStatus.UPCOMING -> "Bevorstehend"
+        TaskCompletionStatus.COMPLETED -> text(TextKey.CONFIRMED)
+        TaskCompletionStatus.MISSING -> text(TextKey.NOT_CONFIRMED)
+        TaskCompletionStatus.UPCOMING -> text(TextKey.UPCOMING)
     }
 
 private fun trackerStatusColor(status: TaskCompletionStatus) =
@@ -96,12 +97,12 @@ internal fun TaskCompletionOverview(
                 ) {
                     Column(Modifier.padding(12.dp)) {
                         Text(
-                            "Monats-Tracker",
+                            text(TextKey.MONTHLY_TRACKER),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            "Kleine Schritte, Tag für Tag.",
+                            text(TextKey.LITTLE_STEPS_DAY_BY_DAY),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -109,11 +110,15 @@ internal fun TaskCompletionOverview(
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { monthValue = month.minusMonths(1).toString() }) {
-                    Icon(Icons.Default.ChevronLeft, "Vorheriger Monat", tint = StatusColors.success)
+                    Icon(
+                        Icons.Default.ChevronLeft,
+                        text(TextKey.PREVIOUS_MONTH),
+                        tint = StatusColors.success,
+                    )
                 }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "Monat",
+                        text(TextKey.MONTH),
                         style = MaterialTheme.typography.labelSmall,
                         color = AppTheme.colors.accent,
                     )
@@ -129,7 +134,7 @@ internal fun TaskCompletionOverview(
                 ) {
                     Icon(
                         Icons.Default.ChevronRight,
-                        "Nächster Monat",
+                        text(TextKey.NEXT_MONTH),
                         tint = if (month < currentMonth) AppTheme.colors.accent else trackerOutline,
                     )
                 }
@@ -157,7 +162,7 @@ internal fun TaskCompletionOverview(
                             else {
                                 val description =
                                     formats.fullDate(day.date) +
-                                        if (day.cells.isEmpty()) ": Keine Ausführung"
+                                        if (day.cells.isEmpty()) text(TextKey.NO_OCCURRENCE)
                                         else
                                             ": " +
                                                 day.cells.joinToString("; ") {
@@ -211,7 +216,7 @@ internal fun TaskCompletionOverview(
                         )
                         if (day.cells.isEmpty())
                             Text(
-                                "Keine Ausführung geplant.",
+                                text(TextKey.NO_OCCURRENCE_SCHEDULED),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         day.cells.forEach { cell ->
@@ -244,7 +249,7 @@ internal fun TaskCompletionOverview(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            "Euer Ergebnis",
+                            text(TextKey.YOUR_PROGRESS),
                             Modifier.weight(1f),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
@@ -284,21 +289,26 @@ internal fun TaskCompletionOverview(
                             trackColor = Color.White.copy(alpha = 0.7f),
                         )
                     Text(
-                        if (tracker.eligible == 0)
-                            "Noch keine fälligen oder bestätigten Ausführungen."
+                        if (tracker.eligible == 0) text(TextKey.NO_DUE_OR_CONFIRMED_OCCURRENCES_YET)
                         else
-                            "Bestätigte Ausführungen. ${tracker.upcoming} bevorstehende zählen noch nicht mit.",
+                            text(
+                                TextKey
+                                    .CONFIRMED_OCCURRENCES_UPCOMING_OCCURRENCES_ARE_NOT_COUNTED_YET,
+                                tracker.upcoming,
+                            ),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
             Text(
-                "Ein Ringabschnitt pro Uhrzeit. Tippe auf einen Tag für die Details. Leere Tage waren nicht geplant; Rot bedeutet fehlende Bestätigung.",
+                text(
+                    TextKey.ONE_RING_SEGMENT_PER_TIME_SLOT_TAP_A_DAY_FOR_DETAILS_EMPTY_DAYS_WERE_NOT
+                ),
                 style = MaterialTheme.typography.bodySmall,
             )
             if (state.fromCache)
                 Text(
-                    "Gespeicherter Stand – Bestätigungen können noch fehlen.",
+                    text(TextKey.SAVED_DATA_SOME_CONFIRMATIONS_MAY_BE_MISSING),
                     style = MaterialTheme.typography.bodySmall,
                 )
             if (month != currentMonth)
@@ -306,7 +316,7 @@ internal fun TaskCompletionOverview(
                     onClick = { monthValue = currentMonth.toString() },
                     modifier = Modifier.align(Alignment.End),
                 ) {
-                    Text("Zum aktuellen Monat")
+                    Text(text(TextKey.CURRENT_MONTH))
                 }
         }
     }

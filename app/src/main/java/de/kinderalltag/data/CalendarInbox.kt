@@ -3,6 +3,7 @@ package de.kinderalltag.data
 import android.content.Context
 import android.net.Uri
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
@@ -57,24 +58,26 @@ class CalendarInbox(context: Context) {
                 ensureLoaded()
                 try {
                     val incoming = mutableListOf<String>()
-                    require(uris.size <= CalendarExchange.MAX_EVENTS) {
-                        "Bitte weniger Kalenderdateien auswählen."
+                    requireLocalized(uris.size <= CalendarExchange.MAX_EVENTS) {
+                        message(TextKey.PLEASE_SELECT_FEWER_CALENDAR_FILES)
                     }
                     var bytes = 0
                     uris.forEach { uri ->
-                        require(uri.scheme == "content") {
-                            "Bitte eine Kalenderdatei über die Dateiauswahl teilen."
+                        requireLocalized(uri.scheme == "content") {
+                            message(TextKey.PLEASE_SHARE_A_CALENDAR_FILE_USING_THE_FILE_PICKER)
                         }
                         val output = ByteArrayOutputStream()
                         context.contentResolver.openInputStream(uri).use { input ->
-                            requireNotNull(input) { "Kalenderdatei konnte nicht geöffnet werden." }
+                            requireNotNullLocalized(input) {
+                                message(TextKey.THE_CALENDAR_FILE_COULD_NOT_BE_OPENED)
+                            }
                             val buffer = ByteArray(8192)
                             while (true) {
                                 val count = input.read(buffer)
                                 if (count < 0) break
                                 bytes += count
-                                require(bytes <= CalendarExchange.MAX_BYTES) {
-                                    "Kalenderdateien dürfen zusammen höchstens 1 MB groß sein."
+                                requireLocalized(bytes <= CalendarExchange.MAX_BYTES) {
+                                    message(TextKey.CALENDAR_FILES_MAY_NOT_EXCEED_1_MB_IN_TOTAL)
                                 }
                                 output.write(buffer, 0, count)
                             }
@@ -82,7 +85,9 @@ class CalendarInbox(context: Context) {
                         incoming += output.toString(Charsets.UTF_8.name())
                     }
                     text?.let { incoming += it }
-                    require(incoming.isNotEmpty()) { "Keine Kalenderdatei empfangen." }
+                    requireLocalized(incoming.isNotEmpty()) {
+                        message(TextKey.NO_CALENDAR_FILE_RECEIVED)
+                    }
                     val previous =
                         if (mutable.value.current != null && file.exists()) file.readText() else ""
                     val combined =
@@ -92,7 +97,7 @@ class CalendarInbox(context: Context) {
                     val result = CalendarExchange.parse(combined)
                     require(result.appointments.isNotEmpty()) {
                         result.errors.joinToString("\n").ifBlank {
-                            "Keine unterstützten Termine gefunden."
+                            text(TextKey.NO_SUPPORTED_APPOINTMENTS_FOUND)
                         }
                     }
                     val index = if (previous.isEmpty()) 0 else mutable.value.index
@@ -101,8 +106,8 @@ class CalendarInbox(context: Context) {
                         else mutable.value.batchId
                     val temporary = File(file.parentFile, "pending-calendar.tmp")
                     temporary.writeText(combined)
-                    check(temporary.renameTo(file)) {
-                        "Kalenderimport konnte nicht zwischengespeichert werden."
+                    checkLocalized(temporary.renameTo(file)) {
+                        message(TextKey.THE_CALENDAR_IMPORT_COULD_NOT_BE_CACHED)
                     }
                     preferences.edit().putInt("index", index).putString("batch", batch).commit()
                     mutable.value =
@@ -115,7 +120,7 @@ class CalendarInbox(context: Context) {
                 } catch (e: Exception) {
                     mutable.value =
                         mutable.value.copy(
-                            error = e.message ?: "Kalenderdatei konnte nicht gelesen werden."
+                            error = e.message ?: text(TextKey.THE_CALENDAR_FILE_COULD_NOT_BE_READ)
                         )
                 }
             }
@@ -152,7 +157,9 @@ class CalendarInbox(context: Context) {
     private fun load() {
         if (!file.exists()) return
         try {
-            require(file.length() <= CalendarExchange.MAX_BYTES) { "Kalenderdatei ist zu groß." }
+            requireLocalized(file.length() <= CalendarExchange.MAX_BYTES) {
+                message(TextKey.THE_CALENDAR_FILE_IS_TOO_LARGE)
+            }
             val result = CalendarExchange.parse(file.readText())
             val index = preferences.getInt("index", 0)
             mutable.value =
@@ -165,7 +172,7 @@ class CalendarInbox(context: Context) {
         } catch (e: Exception) {
             mutable.value =
                 CalendarInboxState(
-                    error = e.message ?: "Kalenderimport konnte nicht geladen werden."
+                    error = e.message ?: text(TextKey.THE_CALENDAR_IMPORT_COULD_NOT_BE_LOADED)
                 )
         }
     }

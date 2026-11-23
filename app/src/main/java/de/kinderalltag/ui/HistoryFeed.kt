@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.kinderalltag.data.FamilyState
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.Instant
 import java.time.LocalDate
 
@@ -58,7 +59,7 @@ internal fun HistoryFeed(
     ) {
         item {
             Text(
-                "Verlauf",
+                text(TextKey.HISTORY),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
@@ -67,7 +68,7 @@ internal fun HistoryFeed(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (entries.isEmpty()) item { Text("Keine Ereignisse in diesem Zeitraum.") }
+        if (entries.isEmpty()) item { Text(text(TextKey.NO_EVENTS_IN_THIS_PERIOD)) }
         entries
             .groupBy { Instant.ofEpochMilli(it.millis).atZone(FAMILY_ZONE).toLocalDate() }
             .forEach { (date, dayEntries) ->
@@ -88,14 +89,23 @@ internal fun HistoryFeed(
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
-                                "${dayEntries.size} ${if (dayEntries.size == 1) "Ereignis" else "Ereignisse"} · neueste zuerst",
+                                text(
+                                    TextKey.NEWEST_FIRST,
+                                    dayEntries.size,
+                                    if (dayEntries.size == 1) text(TextKey.EVENT)
+                                    else text(TextKey.EVENTS),
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             FlowRow(
                                 Modifier.fillMaxWidth().clearAndSetSemantics {
                                     contentDescription =
-                                        "Tagesübersicht: ${dayEntries.size} Ereignisse"
+                                        quantity(
+                                            QuantityKey.DAY_EVENTS,
+                                            dayEntries.size,
+                                            dayEntries.size,
+                                        )
                                 },
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -112,15 +122,15 @@ internal fun HistoryFeed(
 
         item {
             PageNavigationCard(
-                "90 Tage",
+                text(TextKey.VALUE_90_DAYS),
                 "${formats.date(period.from)} – ${formats.date(period.to)}",
                 canPrevious = true,
                 canNext = page > 0,
                 onPrevious = { onPageChange(page + 1) },
                 onNext = { onPageChange(page - 1) },
-                previousDescription = "90 Tage zurück",
-                nextDescription = "90 Tage vor",
-                resetText = if (page > 0) "Zum aktuellen Verlauf" else null,
+                previousDescription = text(TextKey.VALUE_90_DAYS_BACK),
+                nextDescription = text(TextKey.VALUE_90_DAYS_FORWARD),
+                resetText = if (page > 0) text(TextKey.CURRENT_HISTORY) else null,
                 onReset = { onPageChange(0) },
             )
         }
@@ -197,7 +207,11 @@ private fun HistoryEventRow(entry: HistoryEntry, state: FamilyState) {
                 if (subject != null) Text(subject, style = MaterialTheme.typography.bodySmall)
                 Text(
                     if (entry.creditedId != null && entry.creditedId != entry.authorId)
-                        "${entry.creditedName ?: "Elternteil"} · eingetragen von ${entry.authorName}"
+                        text(
+                            TextKey.RECORDED_BY_8B6641,
+                            entry.creditedName ?: text(TextKey.PARENT),
+                            entry.authorName,
+                        )
                     else entry.creditedName ?: entry.authorName,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -211,14 +225,20 @@ private fun HistoryEventRow(entry: HistoryEntry, state: FamilyState) {
                 }
                 entry.subjectDate?.let {
                     Text(
-                        "Bezugstag: ${formats.date(it)}",
+                        text(TextKey.REFERENCE_DAY, formats.date(it)),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 if (entry.pending)
-                    Text("Synchronisierung ausstehend", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text(TextKey.SYNCHRONIZATION_PENDING),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 if (entry.legacy)
-                    Text("Aus vorhandenem Datenstand", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text(TextKey.FROM_AVAILABLE_DATA),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
             }
         }
     }

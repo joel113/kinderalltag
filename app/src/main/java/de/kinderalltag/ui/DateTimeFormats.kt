@@ -30,3 +30,9 @@ internal class DateTimeFormats(val locale: Locale, clockFormat: DateFormat) {
 
     fun timeRange(start: LocalTime, end: LocalTime): String = "${time(start)}–${time(end)}"
 }
+
+internal fun resolveAppLocale(candidates: List<Locale>): Locale {
+    val locale = candidates.firstOrNull { it.language in setOf("de", "en") } ?: Locale.GERMANY
+    return if (locale.country.isNotEmpty()) locale
+    else if (locale.language == "en") Locale.UK else Locale.GERMANY
+}

@@ -1,5 +1,6 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
 import java.time.*
 
 val FAMILY_ZONE: ZoneId = ZoneId.of("Europe/Berlin")
@@ -32,7 +33,8 @@ data class Child(
     val bearColor: BearColor = BearColor.fromStored(null, id),
 )
 
-val HOUSEHOLD_SECTION = Child("haushalt", "Haushalt")
+val HOUSEHOLD_SECTION
+    get() = Child("haushalt", text(TextKey.HOUSEHOLD))
 
 data class Parent(val id: String, val name: String)
 
@@ -59,24 +61,32 @@ data class TaskRevision(
     val interval: Int = 1,
 ) {
     fun validate() {
-        require(interval in 1..1000) { "Intervall: 1 bis 1000." }
-        require(
+        requireLocalized(interval in 1..1000) { message(TextKey.INTERVAL_1_TO_1000) }
+        requireLocalized(
             frequency in setOf(Frequency.DAILY, Frequency.WEEKS, Frequency.MONTHS) || interval == 1
         ) {
-            "Einmalige Aufgaben und feste Wochentage haben kein zusätzliches Intervall."
+            message(TextKey.ONE_OFF_TASKS_AND_FIXED_WEEKDAYS_DO_NOT_HAVE_AN_ADDITIONAL_INTERVAL)
         }
-        require(taskId.isNotBlank() && childId.isNotBlank()) { "Bitte ein Kind auswählen." }
-        require(title.isNotBlank() && title.length <= 120) { "Titel: 1 bis 120 Zeichen." }
-        require(notes.length <= 2000) { "Notizen: höchstens 2000 Zeichen." }
-        require(end == null || end >= start) { "Das Enddatum liegt vor dem Startdatum." }
-        require(times.isNotEmpty() && times.size <= 8 && times.distinct().size == times.size) {
-            "Bitte 1 bis 8 unterschiedliche Uhrzeiten angeben."
+        requireLocalized(taskId.isNotBlank() && childId.isNotBlank()) {
+            message(TextKey.PLEASE_SELECT_A_CHILD)
         }
-        require(times.all { it.second == 0 && it.nano == 0 }) {
-            "Uhrzeiten bitte minutengenau angeben."
+        requireLocalized(title.isNotBlank() && title.length <= 120) {
+            message(TextKey.TITLE_1_TO_120_CHARACTERS)
         }
-        require(frequency != Frequency.WEEKDAYS || weekdays.isNotEmpty()) {
-            "Bitte Wochentage auswählen."
+        requireLocalized(notes.length <= 2000) { message(TextKey.NOTES_UP_TO_2000_CHARACTERS) }
+        requireLocalized(end == null || end >= start) {
+            message(TextKey.THE_END_DATE_IS_BEFORE_THE_START_DATE)
+        }
+        requireLocalized(
+            times.isNotEmpty() && times.size <= 8 && times.distinct().size == times.size
+        ) {
+            message(TextKey.PLEASE_SPECIFY_1_TO_8_DISTINCT_TIMES)
+        }
+        requireLocalized(times.all { it.second == 0 && it.nano == 0 }) {
+            message(TextKey.PLEASE_SPECIFY_TIMES_WITH_MINUTE_PRECISION)
+        }
+        requireLocalized(frequency != Frequency.WEEKDAYS || weekdays.isNotEmpty()) {
+            message(TextKey.PLEASE_SELECT_WEEKDAYS)
         }
     }
 

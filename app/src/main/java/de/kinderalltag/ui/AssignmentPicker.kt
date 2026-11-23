@@ -8,10 +8,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.kinderalltag.domain.Parent
+import de.kinderalltag.text.*
 
 internal fun responsibilityName(parentId: String?, parents: List<Parent>): String =
-    if (parentId == null) "Beide Eltern"
-    else parents.firstOrNull { it.id == parentId }?.name ?: "Elternteil"
+    if (parentId == null) text(TextKey.BOTH_PARENTS)
+    else parents.firstOrNull { it.id == parentId }?.name ?: text(TextKey.PARENT)
 
 @Composable
 internal fun AssignmentPicker(
@@ -20,12 +21,16 @@ internal fun AssignmentPicker(
     onSelect: (String?) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Zuständig", style = MaterialTheme.typography.titleSmall)
+        Text(text(TextKey.ASSIGNED_TO), style = MaterialTheme.typography.titleSmall)
         Row(
             Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FilterChip(selected == null, { onSelect(null) }, label = { Text("Beide Eltern") })
+            FilterChip(
+                selected == null,
+                { onSelect(null) },
+                label = { Text(text(TextKey.BOTH_PARENTS)) },
+            )
             parents.forEach { parent ->
                 FilterChip(
                     selected == parent.id,

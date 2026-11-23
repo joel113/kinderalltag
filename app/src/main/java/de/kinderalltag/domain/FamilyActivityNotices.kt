@@ -1,5 +1,7 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
+
 enum class FamilyNoticeKind {
     NEW_TASK,
     NEW_APPOINTMENT,
@@ -116,7 +118,7 @@ class FamilyActivityNoticeTracker {
                                 }
                             }
                             ?.title
-                        ?: "Aufgabe"
+                        ?: text(TextKey.TASK)
                 notices +=
                     FamilyActivityNotice(
                         "complete:${event.occurrenceId}",

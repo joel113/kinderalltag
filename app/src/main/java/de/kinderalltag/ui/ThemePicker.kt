@@ -12,16 +12,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import de.kinderalltag.text.*
 
 @Composable
 internal fun ThemePicker(selection: ThemeSelection = LocalThemeSelection.current) {
-    Text("Design", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     Text(
-        "Farben, kleine Begleiter und App-Symbol · nur auf diesem Gerät",
+        text(TextKey.THEME),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Text(
+        text(TextKey.COLOURS_LITTLE_COMPANIONS_AND_APP_ICON_ONLY_ON_THIS_DEVICE),
         style = MaterialTheme.typography.bodySmall,
     )
     Text(
-        "Das App-Symbol auf dem Startbildschirm passt sich an. Je nach Launcher kann das einen Moment dauern.",
+        text(TextKey.THE_HOME_SCREEN_APP_ICON_CHANGES_WITH_THE_THEME_YOUR_LAUNCHER_MAY_TAKE_A),
         style = MaterialTheme.typography.bodySmall,
     )
     Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {

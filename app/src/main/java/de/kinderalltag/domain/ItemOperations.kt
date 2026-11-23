@@ -1,5 +1,6 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
 import java.time.*
 
 enum class ItemType {
@@ -40,7 +41,7 @@ data class ItemOperation(
     val restoresId: String? = null,
     val createdMillis: Long = 0,
     val authorId: String = "",
-    val authorName: String = "Elternteil",
+    val authorName: String = text(TextKey.PARENT),
     val version: Long = 0,
 ) {
     val key: String

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import de.kinderalltag.domain.CalendarOverviewState
 import de.kinderalltag.domain.CalendarPreviewItem
 import de.kinderalltag.domain.CalendarView
+import de.kinderalltag.text.*
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -65,15 +66,15 @@ internal fun CalendarOverviewCard(
         }
     val previousLabel =
         when (calendar.view) {
-            CalendarView.DAY -> "Vorheriger Tag"
-            CalendarView.WEEK -> "Vorherige Woche"
-            CalendarView.MONTH -> "Vorheriger Monat"
+            CalendarView.DAY -> text(TextKey.PREVIOUS_DAY)
+            CalendarView.WEEK -> text(TextKey.PREVIOUS_WEEK)
+            CalendarView.MONTH -> text(TextKey.PREVIOUS_MONTH)
         }
     val nextLabel =
         when (calendar.view) {
-            CalendarView.DAY -> "Nächster Tag"
-            CalendarView.WEEK -> "Nächste Woche"
-            CalendarView.MONTH -> "Nächster Monat"
+            CalendarView.DAY -> text(TextKey.NEXT_DAY)
+            CalendarView.WEEK -> text(TextKey.NEXT_WEEK)
+            CalendarView.MONTH -> text(TextKey.NEXT_MONTH)
         }
     Card(
         Modifier.fillMaxWidth(),
@@ -95,9 +96,9 @@ internal fun CalendarOverviewCard(
                     ) {
                         Text(
                             when (view) {
-                                CalendarView.DAY -> "Tag"
-                                CalendarView.WEEK -> "Woche"
-                                CalendarView.MONTH -> "Monat"
+                                CalendarView.DAY -> text(TextKey.DAY)
+                                CalendarView.WEEK -> text(TextKey.WEEK)
+                                CalendarView.MONTH -> text(TextKey.MONTH)
                             }
                         )
                     }
@@ -145,7 +146,7 @@ internal fun CalendarOverviewCard(
                 )
                 items.take(3).forEach { item ->
                     val time =
-                        if (item.allDay) "Ganztägig"
+                        if (item.allDay) text(TextKey.ALL_DAY)
                         else item.times.joinToString(" / ") { formats.time(it) }
                     Row(
                         Modifier.fillMaxWidth()
@@ -170,7 +171,7 @@ internal fun CalendarOverviewCard(
                 }
                 if (items.size > 3)
                     Text(
-                        "+${items.size - 3} weitere – alle Einträge stehen unten in der Liste.",
+                        text(TextKey.MORE_ALL_ENTRIES_ARE_LISTED_BELOW, items.size - 3),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 4.dp),
                     )
@@ -228,9 +229,10 @@ internal fun CalendarOverviewCard(
                                     )
                                     .semantics {
                                         contentDescription =
-                                            "${formats.fullDate(date)}, $itemLabel: $count${if (date == today) ", heute" else ""}. " +
+                                            "${formats.fullDate(date)}, $itemLabel: $count${if (date == today) text(TextKey.TODAY_638B36) else ""}. " +
                                                 items.take(limit).joinToString("; ") { it.title } +
-                                                if (remaining > 0) "; $remaining weitere" else ""
+                                                if (remaining > 0) text(TextKey.MORE, remaining)
+                                                else ""
                                     }
                                     .padding(vertical = 3.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,

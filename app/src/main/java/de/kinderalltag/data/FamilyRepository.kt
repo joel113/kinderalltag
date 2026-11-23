@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.*
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.*
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,7 +58,7 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
         MutableStateFlow(
             FamilyState(
                 uid = auth.currentUser?.uid,
-                name = auth.currentUser?.displayName ?: "Elternteil",
+                name = auth.currentUser?.displayName ?: text(TextKey.PARENT),
             )
         )
     val state = mutable.asStateFlow()
@@ -68,6 +69,7 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
     private val cacheFlags = mutableMapOf<String, Boolean>()
     private val pendingFlags = mutableMapOf<String, Boolean>()
     private val collectionErrors = mutableMapOf<String, SyncIssue>()
+    private var membershipIssue: SyncIssue? = null
     private var generation = 0
 
     init {
@@ -80,6 +82,12 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
         cacheFlags.clear()
         pendingFlags.clear()
         collectionErrors.clear()
+        membershipIssue = null
+    }
+
+    fun refreshPresentation() {
+        val issues = membershipIssue?.let(::listOf) ?: collectionErrors.values.toList()
+        mutable.value = mutable.value.copy(error = syncErrorSummary(issues))
     }
 
     fun retrySync() {
@@ -95,7 +103,7 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
         mutable.value =
             if (keepData && previous.uid == user?.uid && previous.authorized) {
                 previous.copy(loaded = false, fromCache = true, error = null)
-            } else FamilyState(uid = user?.uid, name = user?.displayName ?: "Elternteil")
+            } else FamilyState(uid = user?.uid, name = user?.displayName ?: text(TextKey.PARENT))
         if (user == null) return
         membership =
             household.collection("members").document(user.uid).addSnapshotListener(
@@ -111,10 +119,11 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                             error,
                         )
                     stopData()
+                    membershipIssue = error?.let { SyncIssue("membership", it.code.name) }
                     mutable.value =
                         FamilyState(
                             uid = user.uid,
-                            name = user.displayName ?: "Elternteil",
+                            name = user.displayName ?: text(TextKey.PARENT),
                             accessResolved = error != null || doc?.metadata?.isFromCache == false,
                             error =
                                 error?.let {
@@ -155,7 +164,12 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                             mutable.value.copy(
                                 parents =
                                     snapshot.documents
-                                        .map { Parent(it.id, it.getString("name") ?: "Elternteil") }
+                                        .map {
+                                            Parent(
+                                                it.id,
+                                                it.getString("name") ?: text(TextKey.PARENT),
+                                            )
+                                        }
                                         .sortedBy { it.name }
                             )
                     }
@@ -289,14 +303,14 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
 
     suspend fun saveRevision(revision: TaskRevision) {
         revision.validate()
-        require(mutable.value.revisions.none { it.taskId == revision.taskId }) {
-            "Bestehende Aufgaben bitte über Bearbeiten mit einer Ausführungsauswahl ändern."
+        requireLocalized(mutable.value.revisions.none { it.taskId == revision.taskId }) {
+            message(TextKey.PLEASE_CHANGE_EXISTING_TASKS_THROUGH_EDIT_AND_SELECT_AN_OCCURRENCE)
         }
-        require(
+        requireLocalized(
             revision.effective >= LocalDate.now(FAMILY_ZONE) &&
                 revision.start >= LocalDate.now(FAMILY_ZONE)
         ) {
-            "Neue Aufgaben beginnen frühestens heute."
+            message(TextKey.NEW_TASKS_START_NO_EARLIER_THAN_TODAY)
         }
         val uid = requireNotNull(auth.currentUser?.uid)
         // Transactions require a server connection. Definitions never enter the offline write
@@ -329,7 +343,7 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
     fun acknowledge(occurrence: Occurrence, completedById: String, onError: (String) -> Unit) {
         val parent = mutable.value.parents.firstOrNull { it.id == completedById }
         if (parent == null) {
-            onError("Elternteil nicht verfügbar. Bitte Familienzugang neu laden.")
+            onError(text(TextKey.PARENT_UNAVAILABLE_PLEASE_RELOAD_FAMILY_ACCESS))
             return
         }
         writeEvents(occurrence, listOf(null), onError, parent)
@@ -351,9 +365,7 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
         targets.forEach { target ->
             val targetEvent = target?.let { id -> mutable.value.events.firstOrNull { it.id == id } }
             if (target != null && targetEvent == null) {
-                onError(
-                    "Die Bestätigung wurde inzwischen geändert. Bitte schließen und neu öffnen."
-                )
+                onError(text(TextKey.THE_CONFIRMATION_HAS_CHANGED_PLEASE_CLOSE_AND_REOPEN_IT))
                 return
             }
             val data =
@@ -362,7 +374,7 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                     "date" to (targetEvent?.date ?: occurrence.date).toString(),
                     "kind" to if (target == null) "COMPLETE" else "RETRACT",
                     "authorId" to user.uid,
-                    "authorName" to (user.displayName ?: "Elternteil").take(120),
+                    "authorName" to (user.displayName ?: text(TextKey.PARENT)).take(120),
                     "clientMillis" to System.currentTimeMillis(),
                     "createdAt" to FieldValue.serverTimestamp(),
                     "targetId" to target,
@@ -393,12 +405,12 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
     suspend fun applyOperation(request: ItemOperation, expectedVersion: Long) {
         val user = requireNotNull(auth.currentUser)
         val state = mutable.value
-        require(state.loaded && !state.fromCache && state.error == null) {
-            "Für diese Änderung ist eine aktuelle Serververbindung erforderlich."
+        requireLocalized(state.loaded && !state.fromCache && state.error == null) {
+            message(TextKey.THIS_CHANGE_REQUIRES_A_CURRENT_SERVER_CONNECTION)
         }
         val now = Instant.now()
         if (request.action == OperationAction.EDIT) {
-            require(
+            requireLocalized(
                 activeDeletions(state.itemOperations).none {
                     it.covers(
                         request.type,
@@ -409,7 +421,7 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                     )
                 }
             ) {
-                "Dieser Eintrag wurde gelöscht. Bitte zuerst im Papierkorb wiederherstellen."
+                message(TextKey.THIS_ENTRY_WAS_DELETED_PLEASE_RESTORE_IT_FROM_TRASH_FIRST)
             }
             if (request.type == ItemType.TASK) {
                 val original =
@@ -432,12 +444,15 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                         Schedule.activeCompletions(state.events, original.id).isEmpty()) ||
                         (resuming && Instant.ofEpochMilli(request.actualStartMillis) > now)
                 ) {
-                    "Bestätigte Ausführungen und begonnene Wiederholungen bleiben unverändert. Bitte eine kommende Ausführung wählen."
+                    text(
+                        TextKey
+                            .CONFIRMED_OCCURRENCES_AND_RECURRING_TASKS_THAT_HAVE_STARTED_REMAIN_UNCHA
+                    )
                 }
                 requireNotNull(request.task).validate()
                 if (request.scope == OperationScope.SINGLE)
-                    require(request.task.times.size == 1) {
-                        "Bitte genau eine Uhrzeit für diese Ausführung wählen."
+                    requireLocalized(request.task.times.size == 1) {
+                        message(TextKey.PLEASE_SELECT_EXACTLY_ONE_TIME_FOR_THIS_OCCURRENCE)
                     }
             } else {
                 requireNotNull(request.appointment).validate()
@@ -452,35 +467,37 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                         .copy(date = request.appointment.activeFrom)
                         .startInstant > now
                 )
-                require(source != null && source.details.startInstant > now) {
-                    "Begonnene Termine bleiben unverändert."
+                requireLocalized(source != null && source.details.startInstant > now) {
+                    message(TextKey.APPOINTMENTS_THAT_HAVE_STARTED_REMAIN_UNCHANGED)
                 }
             }
         }
         if (request.action == OperationAction.RESTORE)
-            require(activeDeletions(state.itemOperations).any { it.id == request.restoresId }) {
-                "Dieser Eintrag wurde bereits wiederhergestellt."
+            requireLocalized(
+                activeDeletions(state.itemOperations).any { it.id == request.restoresId }
+            ) {
+                message(TextKey.THIS_ENTRY_HAS_ALREADY_BEEN_RESTORED)
             }
         val operation =
             request.copy(
                 authorId = user.uid,
-                authorName = (user.displayName ?: "Elternteil").take(120),
+                authorName = (user.displayName ?: text(TextKey.PARENT)).take(120),
                 version = expectedVersion + 1,
             )
         db.runTransaction { tx ->
                 check(tx.get(household.collection("members").document(user.uid)).exists())
                 val control = household.collection("itemControls").document(operation.key)
                 val current = tx.get(control)
-                check((current.getLong("version") ?: 0L) == expectedVersion) {
-                    "Der Eintrag wurde inzwischen geändert. Bitte schließen und neu öffnen."
+                checkLocalized((current.getLong("version") ?: 0L) == expectedVersion) {
+                    message(TextKey.THIS_ENTRY_HAS_CHANGED_PLEASE_CLOSE_AND_REOPEN_IT)
                 }
                 val sourceCollection =
                     if (operation.type == ItemType.TASK) "revisions" else "appointmentSeries"
-                check(
+                checkLocalized(
                     tx.get(household.collection(sourceCollection).document(operation.sourceId))
                         .exists()
                 ) {
-                    "Der ursprüngliche Eintrag ist nicht mehr verfügbar."
+                    message(TextKey.THE_ORIGINAL_ENTRY_IS_NO_LONGER_AVAILABLE)
                 }
                 if (operation.action == OperationAction.RESTORE)
                     check(
@@ -514,14 +531,16 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
 
     suspend fun createAppointment(draft: AppointmentSeries) {
         draft.validate()
-        require(draft.details.copy(date = draft.activeFrom).startInstant > Instant.now()) {
-            "Neue Termine müssen in der Zukunft liegen."
+        requireLocalized(draft.details.copy(date = draft.activeFrom).startInstant > Instant.now()) {
+            message(TextKey.NEW_APPOINTMENTS_MUST_BE_IN_THE_FUTURE)
         }
         val user = requireNotNull(auth.currentUser)
         db.runTransaction { tx ->
                 check(tx.get(household.collection("members").document(user.uid)).exists())
                 val ref = household.collection("appointmentSeries").document(draft.id)
-                check(!tx.get(ref).exists()) { "Termin existiert bereits. Bitte neu laden." }
+                checkLocalized(!tx.get(ref).exists()) {
+                    message(TextKey.THE_APPOINTMENT_ALREADY_EXISTS_PLEASE_RELOAD)
+                }
                 tx.set(ref, draft.encodeAppointment(user.uid))
                 val activity =
                     AppointmentActivity(
@@ -533,7 +552,7 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                         draft.details,
                         null,
                         user.uid,
-                        (user.displayName ?: "Elternteil").take(120),
+                        (user.displayName ?: text(TextKey.PARENT)).take(120),
                         0,
                     )
                 tx.set(
@@ -596,7 +615,7 @@ private fun decodeEvent(doc: DocumentSnapshot) =
         date = LocalDate.parse(doc.getString("date")),
         kind = EventKind.valueOf(requireNotNull(doc.getString("kind"))),
         authorId = requireNotNull(doc.getString("authorId")),
-        authorName = doc.getString("authorName") ?: "Elternteil",
+        authorName = doc.getString("authorName") ?: text(TextKey.PARENT),
         clientMillis = doc.getLong("clientMillis") ?: 0,
         serverMillis = doc.getTimestamp("createdAt")?.toDate()?.time,
         targetId = doc.getString("targetId"),

@@ -15,6 +15,7 @@ import de.kinderalltag.R
 import de.kinderalltag.data.FamilyState
 import de.kinderalltag.data.taskOccurrences
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 
 object ActivityNotifications {
     private const val CHANNEL = "family_activity"
@@ -40,7 +41,7 @@ object ActivityNotifications {
             .createNotificationChannel(
                 NotificationChannel(
                     CHANNEL,
-                    "Neuigkeiten aus der Familie",
+                    text(TextKey.FAMILY_UPDATES),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 )
             )
@@ -150,15 +151,16 @@ object ActivityNotifications {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
             val author =
-                state.parents.firstOrNull { it.id == notice.authorId }?.name ?: "Dein Partner"
+                state.parents.firstOrNull { it.id == notice.authorId }?.name
+                    ?: text(TextKey.YOUR_PARTNER)
             val notification =
                 Notification.Builder(context, CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(
                         when (notice.kind) {
-                            FamilyNoticeKind.NEW_TASK -> "Neue Aufgabe"
-                            FamilyNoticeKind.NEW_APPOINTMENT -> "Neuer Termin"
-                            FamilyNoticeKind.TASK_COMPLETED -> "Aufgabe erledigt"
+                            FamilyNoticeKind.NEW_TASK -> text(TextKey.NEW_TASK)
+                            FamilyNoticeKind.NEW_APPOINTMENT -> text(TextKey.NEW_APPOINTMENT)
+                            FamilyNoticeKind.TASK_COMPLETED -> text(TextKey.TASK_COMPLETED)
                         }
                     )
                     .setContentText("$author: ${notice.title}")

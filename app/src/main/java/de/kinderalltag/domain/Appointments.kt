@@ -1,5 +1,6 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
 import java.time.*
 import java.time.temporal.ChronoUnit
 
@@ -62,19 +63,23 @@ data class AppointmentDetails(
             }
 
     fun validate() {
-        require(title.isNotBlank() && title.length <= 120) { "Titel: 1 bis 120 Zeichen." }
-        require(location.length <= 300 && notes.length <= 2000) { "Ort oder Notizen sind zu lang." }
-        require(allDay || endTime > startTime) {
-            "Das Ende muss nach dem Beginn liegen (am selben Tag)."
+        requireLocalized(title.isNotBlank() && title.length <= 120) {
+            message(TextKey.TITLE_1_TO_120_CHARACTERS)
         }
-        require(listOf(startTime, endTime).all { it.second == 0 && it.nano == 0 }) {
-            "Bitte minutengenaue Uhrzeiten verwenden."
+        requireLocalized(location.length <= 300 && notes.length <= 2000) {
+            message(TextKey.LOCATION_OR_NOTES_ARE_TOO_LONG)
         }
-        require(
+        requireLocalized(allDay || endTime > startTime) {
+            message(TextKey.THE_END_MUST_BE_AFTER_THE_START_ON_THE_SAME_DAY)
+        }
+        requireLocalized(listOf(startTime, endTime).all { it.second == 0 && it.nano == 0 }) {
+            message(TextKey.PLEASE_USE_TIMES_WITH_MINUTE_PRECISION)
+        }
+        requireLocalized(
             reminderMinutes == null ||
                 reminderMinutes in if (allDay) listOf(0, 1440) else listOf(0, 15, 30, 60, 1440)
         ) {
-            "Bitte eine gültige Erinnerung auswählen."
+            message(TextKey.PLEASE_SELECT_A_VALID_REMINDER)
         }
     }
 }
@@ -98,16 +103,18 @@ data class AppointmentSeries(
 
     fun validate() {
         details.validate()
-        require(interval in 1..1000) { "Intervall: 1 bis 1000." }
-        require(repeat != AppointmentRepeat.ONCE || interval == 1) {
-            "Einmalige Termine haben kein Intervall."
+        requireLocalized(interval in 1..1000) { message(TextKey.INTERVAL_1_TO_1000) }
+        requireLocalized(repeat != AppointmentRepeat.ONCE || interval == 1) {
+            message(TextKey.ONE_OFF_APPOINTMENTS_HAVE_NO_INTERVAL)
         }
-        require(activeFrom >= details.date) { "Der Serienbeginn liegt vor dem Rhythmusbeginn." }
-        require(until == null || until >= activeFrom) {
-            "Das Enddatum liegt vor dem ersten Termin."
+        requireLocalized(activeFrom >= details.date) {
+            message(TextKey.THE_SERIES_BEGINS_BEFORE_THE_RECURRENCE_STARTS)
         }
-        require(copy(cutoff = null).contains(activeFrom)) {
-            "Der Serienbeginn passt nicht zum Intervall."
+        requireLocalized(until == null || until >= activeFrom) {
+            message(TextKey.THE_END_DATE_IS_BEFORE_THE_FIRST_APPOINTMENT)
+        }
+        requireLocalized(copy(cutoff = null).contains(activeFrom)) {
+            message(TextKey.THE_SERIES_START_DOES_NOT_MATCH_THE_INTERVAL)
         }
     }
 

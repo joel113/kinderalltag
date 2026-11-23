@@ -8,6 +8,7 @@ import android.provider.CalendarContract
 import android.widget.Toast
 import de.kinderalltag.domain.AppointmentOccurrence
 import de.kinderalltag.domain.calendarEventCopy
+import de.kinderalltag.text.*
 
 internal fun saveAppointmentToCalendar(
     context: Context,
@@ -34,14 +35,14 @@ internal fun saveAppointmentToCalendar(
     } catch (_: ActivityNotFoundException) {
         Toast.makeText(
                 context,
-                "Keine passende Kalender-App gefunden. Du kannst den Termin stattdessen über „Teilen“ weitergeben.",
+                text(TextKey.NO_MATCHING_CALENDAR_APP_FOUND_YOU_CAN_USE_SHARE_INSTEAD),
                 Toast.LENGTH_LONG,
             )
             .show()
     } catch (_: SecurityException) {
         Toast.makeText(
                 context,
-                "Die Kalender-App konnte nicht geöffnet werden. Bitte versuche es über „Teilen“.",
+                text(TextKey.THE_CALENDAR_APP_COULD_NOT_BE_OPENED_PLEASE_TRY_SHARE_INSTEAD),
                 Toast.LENGTH_LONG,
             )
             .show()

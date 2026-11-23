@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import de.kinderalltag.text.*
 
 @Composable
 internal fun ItemMetadataIndicators(notes: String, location: String = "") {
@@ -23,9 +24,14 @@ internal fun ItemMetadataIndicators(notes: String, location: String = "") {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (notes.isNotBlank())
-            MetadataIndicator("Notizen", Icons.Default.Notes, AppTheme.colors.primary)
+            MetadataIndicator(text(TextKey.NOTES), Icons.Default.Notes, AppTheme.colors.primary)
         if (location.isNotBlank())
-            MetadataIndicator(location.trim(), Icons.Default.Place, AppTheme.colors.accent, "Ort")
+            MetadataIndicator(
+                location.trim(),
+                Icons.Default.Place,
+                AppTheme.colors.accent,
+                text(TextKey.LOCATION),
+            )
     }
 }
 

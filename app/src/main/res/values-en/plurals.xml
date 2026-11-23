@@ -1,0 +1,18 @@
+<resources>
+    <plurals name="task_progress">
+        <item quantity="one">"%1$d of %2$d task completed"</item>
+        <item quantity="other">"%1$d of %2$d tasks completed"</item>
+    </plurals>
+    <plurals name="appointment_progress">
+        <item quantity="one">"%1$d of %2$d appointment finished"</item>
+        <item quantity="other">"%1$d of %2$d appointments finished"</item>
+    </plurals>
+    <plurals name="import_queued">
+        <item quantity="one">"%1$d shopping item queued for synchronization."</item>
+        <item quantity="other">"%1$d shopping items queued for synchronization."</item>
+    </plurals>
+    <plurals name="day_events">
+        <item quantity="one">"Day overview: %1$d event"</item>
+        <item quantity="other">"Day overview: %1$d events"</item>
+    </plurals>
+</resources>

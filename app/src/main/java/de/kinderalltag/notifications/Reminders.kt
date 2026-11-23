@@ -12,6 +12,7 @@ import de.kinderalltag.MainActivity
 import de.kinderalltag.R
 import de.kinderalltag.data.*
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
@@ -54,7 +55,7 @@ object ReminderScheduler {
             .createNotificationChannel(
                 NotificationChannel(
                     CHANNEL,
-                    "Aufgaben & Termine",
+                    text(TextKey.TASKS_APPOINTMENTS),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 )
             )
@@ -161,6 +162,10 @@ object ReminderScheduler {
                     .put("date", occurrence.date)
                     .put("at", occurrence.at.toEpochMilli())
                     .put("title", occurrence.title)
+                    .put("itemTitle", occurrence.itemTitle)
+                    .put("subjectId", occurrence.subjectId ?: JSONObject.NULL)
+                    .put("recipient", occurrence.recipient?.name ?: JSONObject.NULL)
+                    .put("subjectName", occurrence.subjectName ?: JSONObject.NULL)
                     .put("kind", occurrence.kind)
                     .put("expiresAt", occurrence.expiresAt.toEpochMilli())
                     .put("fingerprint", occurrence.fingerprint)
@@ -241,6 +246,51 @@ object ReminderScheduler {
         prefs(context).edit().putString("records", remaining.toString()).apply()
         context.getSystemService(AlarmManager::class.java).cancel(intent(context, id))
     }
+}
+
+internal fun localizedReminderTitle(context: Context, item: JSONObject): String {
+    if (item.has("itemTitle")) {
+        fun field(key: String): String? =
+            if (item.isNull(key)) null else item.optString(key).takeIf { it.isNotEmpty() }
+        return reminderDisplayTitle(
+            item.getString("itemTitle"),
+            field("subjectId"),
+            field("recipient")?.let {
+                runCatching { AppointmentRecipient.valueOf(it) }.getOrNull()
+            },
+            field("subjectName"),
+        )
+    }
+    // Older payloads contained a preformatted title. Reconstruct from the existing cache if
+    // possible.
+    val state = (context.applicationContext as? KinderApplication)?.repository?.state?.value
+    val day = runCatching { LocalDate.parse(item.optString("date")) }.getOrNull()
+    if (state != null && day != null) {
+        val id = item.getString("id")
+        state
+            .taskOccurrences(day)
+            .firstOrNull { it.id == id }
+            ?.let {
+                return reminderDisplayTitle(
+                    it.revision.title,
+                    it.revision.childId,
+                    null,
+                    state.sections.firstOrNull { child -> child.id == it.revision.childId }?.name,
+                )
+            }
+        state
+            .appointmentOccurrences(day, day)
+            .firstOrNull { it.id == id }
+            ?.let {
+                return reminderDisplayTitle(
+                    it.details.title,
+                    null,
+                    it.details.recipient,
+                    appointmentRecipientName(it.details.recipient, state.sections),
+                )
+            }
+    }
+    return text(if (item.optString("kind") == "appointment") TextKey.APPOINTMENT else TextKey.TASK)
 }
 
 class ReminderReceiver : BroadcastReceiver() {
@@ -330,10 +380,11 @@ class ReminderReceiver : BroadcastReceiver() {
         val notification =
             Notification.Builder(context, ReminderScheduler.CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(item.getString("title"))
+                .setContentTitle(localizedReminderTitle(context, item))
                 .setContentText(
-                    if (item.optString("kind") == "appointment") "Termin öffnen und Details prüfen"
-                    else "Aufgabe öffnen und gemeinsamen Status prüfen"
+                    if (item.optString("kind") == "appointment")
+                        text(TextKey.OPEN_APPOINTMENT_AND_CHECK_DETAILS)
+                    else text(TextKey.OPEN_TASK_AND_CHECK_THE_SHARED_STATUS)
                 )
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
                 .setContentIntent(tap)

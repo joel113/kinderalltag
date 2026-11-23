@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import de.kinderalltag.domain.moveListItem
+import de.kinderalltag.text.*
 
 internal class ListReorderState(
     val list: LazyListState,
@@ -181,17 +182,17 @@ internal fun ListDragHandle(
             modifier =
                 Modifier.size(48.dp)
                     .semantics {
-                        contentDescription = "$title verschieben"
+                        contentDescription = text(TextKey.MOVE, title)
                         if (enabled)
                             customActions =
                                 listOfNotNull(
                                     if (reorder.canMove(id, -1))
-                                        CustomAccessibilityAction("Nach oben") {
+                                        CustomAccessibilityAction(text(TextKey.MOVE_UP)) {
                                             reorder.moveOne(id, -1)
                                         }
                                     else null,
                                     if (reorder.canMove(id, 1))
-                                        CustomAccessibilityAction("Nach unten") {
+                                        CustomAccessibilityAction(text(TextKey.MOVE_DOWN)) {
                                             reorder.moveOne(id, 1)
                                         }
                                     else null,
@@ -219,7 +220,8 @@ internal fun ListDragHandle(
             )
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            listOf(-1 to "Nach oben", 1 to "Nach unten").forEach { (direction, label) ->
+            listOf(-1 to text(TextKey.MOVE_UP), 1 to text(TextKey.MOVE_DOWN)).forEach {
+                (direction, label) ->
                 DropdownMenuItem(
                     text = { Text(label) },
                     leadingIcon = {

@@ -17,6 +17,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import de.kinderalltag.data.FamilyState
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -61,7 +62,12 @@ internal fun StatisticsScreen(
         contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { AppBanner("Euer Alltag in Zahlen", "Kleine Schritte, die euren Alltag tragen.") }
+        item {
+            AppBanner(
+                text(TextKey.YOUR_FAMILY_DAY_IN_NUMBERS),
+                text(TextKey.LITTLE_STEPS_THAT_CARRY_YOUR_FAMILY_DAY),
+            )
+        }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -69,7 +75,7 @@ internal fun StatisticsScreen(
                         FilterChip(
                             selected = days == value,
                             onClick = { onDaysChange(value) },
-                            label = { Text("$value Tage") },
+                            label = { Text(text(TextKey.DAYS, value)) },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -92,9 +98,13 @@ internal fun StatisticsScreen(
                     Modifier.fillMaxWidth().padding(20.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    StatisticsCounter("Ereignisse", statistics.total.events, Modifier.weight(1f))
                     StatisticsCounter(
-                        "Erledigte Aufgaben",
+                        text(TextKey.EVENTS),
+                        statistics.total.events,
+                        Modifier.weight(1f),
+                    )
+                    StatisticsCounter(
+                        text(TextKey.COMPLETED_TASKS),
                         statistics.total.completedTasks,
                         Modifier.weight(1f),
                     )
@@ -114,24 +124,24 @@ internal fun StatisticsScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     StatisticsCounter(
-                        "Besorgte Artikel",
+                        text(TextKey.BOUGHT_ITEMS),
                         statistics.total.boughtShopping,
                         Modifier.weight(1f),
                     )
                     StatisticsCounter(
-                        "Gekaufte Geschenke",
+                        text(TextKey.BOUGHT_GIFTS),
                         statistics.total.boughtGifts,
                         Modifier.weight(1f),
                     )
                 }
             }
         }
-        if (statistics.total.events == 0) item { Text("Keine Ereignisse in diesem Zeitraum.") }
+        if (statistics.total.events == 0) item { Text(text(TextKey.NO_EVENTS_IN_THIS_PERIOD)) }
         if (statistics.total.events > 0)
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "Farben der Ereignisse",
+                        text(TextKey.EVENT_COLOURS),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -162,11 +172,11 @@ internal fun StatisticsScreen(
                     }
                 }
             }
-        item { StatisticsBreakdown("Nach Elternteil", statistics.parents) }
-        item { StatisticsBreakdown("Nach Bereich", statistics.subjects) }
+        item { StatisticsBreakdown(text(TextKey.BY_PARENT), statistics.parents) }
+        item { StatisticsBreakdown(text(TextKey.BY_AREA), statistics.subjects) }
         item {
             StatisticsBreakdown(
-                "Nach Wochentag",
+                text(TextKey.BY_WEEKDAY),
                 statistics.weekdays.map { row ->
                     row.copy(
                         label =
@@ -178,44 +188,56 @@ internal fun StatisticsScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Gezählt wird der Tag der Eintragung, nicht der geplante Tag. Bestätigungen zählen zum ausgewählten Elternteil, andere Ereignisse zur Person, die sie eingetragen hat.",
+                    text(
+                        TextKey
+                            .COUNTS_USE_THE_DAY_THE_EVENT_WAS_RECORDED_NOT_ITS_SCHEDULED_DAY_CONFIRMA
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
-                    "Erledigte Aufgaben: Jede Ausführung zählt einmal, anhand der ersten noch gültigen Bestätigung. Zurückgenommene Bestätigungen zählen nicht; spätere Korrekturen können frühere Statistiken verändern.",
+                    text(
+                        TextKey
+                            .COMPLETED_TASKS_EACH_OCCURRENCE_COUNTS_ONCE_USING_ITS_FIRST_STILL_VALID
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
-                    "Gekaufte Einträge zählen anhand der ersten noch gültigen Kaufbestätigung einmal. Wieder geöffnete Einträge zählen nicht. Änderungen können auch frühere Zeiträume beeinflussen.",
+                    text(
+                        TextKey
+                            .PURCHASED_ENTRIES_COUNT_ONCE_USING_THEIR_FIRST_STILL_VALID_PURCHASE_CONF
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
-                    "Ältere Terminereignisse können unvollständig sein.",
+                    text(TextKey.OLDER_APPOINTMENT_EVENTS_MAY_BE_INCOMPLETE),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 if (statistics.reconstructedEvents > 0)
                     Text(
-                        "Aus vorhandenem Datenstand rekonstruiert: ${statistics.reconstructedEvents}.",
+                        text(
+                            TextKey.RECONSTRUCTED_FROM_AVAILABLE_DATA,
+                            statistics.reconstructedEvents,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 if (statistics.pendingEvents > 0)
                     Text(
-                        "Noch nicht synchronisierte Ereignisse: ${statistics.pendingEvents}.",
+                        text(TextKey.EVENTS_NOT_YET_SYNCHRONIZED, statistics.pendingEvents),
                         style = MaterialTheme.typography.bodySmall,
                     )
             }
         }
         item {
             PageNavigationCard(
-                "$days Tage",
+                text(TextKey.DAYS, days),
                 "${formats.date(period.from)} – ${formats.date(period.to)}",
                 canPrevious = true,
                 canNext = page > 0,
                 onPrevious = { onPageChange(page + 1) },
                 onNext = { onPageChange(page - 1) },
-                previousDescription = "$days Tage zurück",
-                nextDescription = "$days Tage vor",
-                resetText = if (page > 0) "Zum aktuellen Zeitraum" else null,
+                previousDescription = text(TextKey.DAYS_BACK, days),
+                nextDescription = text(TextKey.DAYS_FORWARD, days),
+                resetText = if (page > 0) text(TextKey.CURRENT_PERIOD) else null,
                 onReset = { onPageChange(0) },
             )
         }
@@ -251,7 +273,7 @@ private fun StatisticsBreakdown(title: String, rows: List<StatisticsRow>) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             if (rows.isEmpty())
                 Text(
-                    "Noch keine Elternteile verfügbar.",
+                    text(TextKey.NO_PARENTS_AVAILABLE_YET),
                     style = MaterialTheme.typography.bodySmall,
                 )
             rows.forEach { row ->
@@ -262,12 +284,16 @@ private fun StatisticsBreakdown(title: String, rows: List<StatisticsRow>) {
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "${row.counts.events} ${if (row.counts.events == 1) "Ereignis" else "Ereignisse"} · " +
-                            "${row.counts.completedTasks} ${if (row.counts.completedTasks == 1) "erledigte Aufgabe" else "erledigte Aufgaben"}",
+                        "${row.counts.events} ${if (row.counts.events == 1) text(TextKey.EVENT) else text(TextKey.EVENTS)} · " +
+                            "${row.counts.completedTasks} ${if (row.counts.completedTasks == 1) text(TextKey.COMPLETED_TASK) else text(TextKey.COMPLETED_TASKS_319F86)}",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        "Gekauft: ${row.counts.boughtShopping} Einkäufe · ${row.counts.boughtGifts} Geschenkideen",
+                        text(
+                            TextKey.BOUGHT_SHOPPING_ITEMS_GIFT_IDEAS,
+                            row.counts.boughtShopping,
+                            row.counts.boughtGifts,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Box(
@@ -281,7 +307,7 @@ private fun StatisticsBreakdown(title: String, rows: List<StatisticsRow>) {
                                         .joinToString("; ") { (kind, count) ->
                                             "${statisticsKindLabel(kind)}: $count"
                                         }
-                                        .ifEmpty { "Keine Ereignisse" }
+                                        .ifEmpty { text(TextKey.NO_EVENTS) }
                             }
                     ) {
                         if (row.counts.events > 0)
@@ -308,28 +334,28 @@ private fun StatisticsBreakdown(title: String, rows: List<StatisticsRow>) {
 
 private fun statisticsKindLabel(kind: HistoryKind): String =
     when (kind) {
-        HistoryKind.SHOPPING_ADDED -> "Einkauf angelegt"
-        HistoryKind.SHOPPING_CHANGED -> "Einkauf geändert"
-        HistoryKind.SHOPPING_BOUGHT -> "Einkauf gekauft"
-        HistoryKind.SHOPPING_REOPENED -> "Einkauf wieder geöffnet"
-        HistoryKind.SHOPPING_DELETED -> "Einkauf gelöscht"
-        HistoryKind.SHOPPING_RESTORED -> "Einkauf wiederhergestellt"
-        HistoryKind.GIFT_ADDED -> "Geschenkidee angelegt"
-        HistoryKind.GIFT_CHANGED -> "Geschenkidee geändert"
-        HistoryKind.GIFT_BOUGHT -> "Geschenkidee gekauft"
-        HistoryKind.GIFT_REOPENED -> "Geschenkidee wieder geöffnet"
-        HistoryKind.GIFT_DELETED -> "Geschenkidee gelöscht"
-        HistoryKind.GIFT_RESTORED -> "Geschenkidee wiederhergestellt"
-        HistoryKind.TASK_COMPLETED -> "Bestätigungen"
-        HistoryKind.TASK_CORRECTED -> "Korrekturen"
-        HistoryKind.TASK_UPDATED -> "Aufgabenverwaltung"
-        HistoryKind.APPOINTMENT_ADDED -> "Neue Termine"
-        HistoryKind.APPOINTMENT_CHANGED -> "Terminänderungen"
-        HistoryKind.APPOINTMENT_CANCELLED -> "Terminabsagen"
-        HistoryKind.TASK_DELETED -> "Gelöschte Aufgaben"
-        HistoryKind.TASK_RESTORED -> "Wiederhergestellte Aufgaben"
-        HistoryKind.APPOINTMENT_DELETED -> "Gelöschte Termine"
-        HistoryKind.APPOINTMENT_RESTORED -> "Wiederhergestellte Termine"
+        HistoryKind.SHOPPING_ADDED -> text(TextKey.SHOPPING_ITEM_ADDED)
+        HistoryKind.SHOPPING_CHANGED -> text(TextKey.SHOPPING_ITEM_CHANGED)
+        HistoryKind.SHOPPING_BOUGHT -> text(TextKey.SHOPPING_ITEM_BOUGHT)
+        HistoryKind.SHOPPING_REOPENED -> text(TextKey.SHOPPING_ITEM_REOPENED)
+        HistoryKind.SHOPPING_DELETED -> text(TextKey.SHOPPING_ITEM_DELETED)
+        HistoryKind.SHOPPING_RESTORED -> text(TextKey.SHOPPING_ITEM_RESTORED)
+        HistoryKind.GIFT_ADDED -> text(TextKey.GIFT_IDEA_ADDED)
+        HistoryKind.GIFT_CHANGED -> text(TextKey.GIFT_IDEA_CHANGED)
+        HistoryKind.GIFT_BOUGHT -> text(TextKey.GIFT_IDEA_BOUGHT)
+        HistoryKind.GIFT_REOPENED -> text(TextKey.GIFT_IDEA_REOPENED)
+        HistoryKind.GIFT_DELETED -> text(TextKey.GIFT_IDEA_DELETED)
+        HistoryKind.GIFT_RESTORED -> text(TextKey.GIFT_IDEA_RESTORED)
+        HistoryKind.TASK_COMPLETED -> text(TextKey.CONFIRMATIONS)
+        HistoryKind.TASK_CORRECTED -> text(TextKey.CORRECTIONS)
+        HistoryKind.TASK_UPDATED -> text(TextKey.TASK_MANAGEMENT)
+        HistoryKind.APPOINTMENT_ADDED -> text(TextKey.NEW_APPOINTMENTS)
+        HistoryKind.APPOINTMENT_CHANGED -> text(TextKey.APPOINTMENT_CHANGES)
+        HistoryKind.APPOINTMENT_CANCELLED -> text(TextKey.APPOINTMENT_CANCELLATIONS)
+        HistoryKind.TASK_DELETED -> text(TextKey.DELETED_TASKS)
+        HistoryKind.TASK_RESTORED -> text(TextKey.RESTORED_TASKS)
+        HistoryKind.APPOINTMENT_DELETED -> text(TextKey.DELETED_APPOINTMENTS)
+        HistoryKind.APPOINTMENT_RESTORED -> text(TextKey.RESTORED_APPOINTMENTS)
     }
 
 @Preview(name = "Statistik", widthDp = 390, heightDp = 820)

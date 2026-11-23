@@ -1,5 +1,6 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
 import java.time.ZoneOffset
 
 /** One resolved occurrence, copied into a calendar editor without identifiers or recurrence. */
@@ -28,7 +29,7 @@ fun calendarEventCopy(
     return CalendarEventCopy(
         details.title,
         details.location,
-        listOf("Kinderalltag · $recipientLabel", details.notes)
+        listOf(text(TextKey.KINDERALLTAG, recipientLabel), details.notes)
             .filter { it.isNotBlank() }
             .joinToString("\n\n"),
         start.toEpochMilli(),

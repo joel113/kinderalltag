@@ -1,5 +1,6 @@
 package de.kinderalltag.domain
 
+import de.kinderalltag.text.*
 import java.text.Collator
 import java.util.Locale
 
@@ -32,7 +33,9 @@ data class FamilyLabel(
     val version: Long = 0,
 ) {
     fun validate() {
-        require(name.isNotBlank() && name.length <= 60) { "Label: 1 bis 60 Zeichen." }
+        requireLocalized(name.isNotBlank() && name.length <= 60) {
+            message(TextKey.LABEL_1_TO_60_CHARACTERS)
+        }
     }
 }
 
@@ -48,10 +51,14 @@ data class FamilyListItem(
     val lastActivityId: String = "",
 ) {
     fun validate() {
-        require(title.isNotBlank() && title.length <= 120) { "Titel: 1 bis 120 Zeichen." }
-        require(notes.length <= 2000) { "Notizen: höchstens 2000 Zeichen." }
-        require(labelIds.size <= 6) { "Bitte höchstens 6 Labels auswählen." }
-        require(
+        requireLocalized(title.isNotBlank() && title.length <= 120) {
+            message(TextKey.TITLE_1_TO_120_CHARACTERS)
+        }
+        requireLocalized(notes.length <= 2000) { message(TextKey.NOTES_UP_TO_2000_CHARACTERS) }
+        requireLocalized(labelIds.size <= 6) {
+            message(TextKey.PLEASE_SELECT_NO_MORE_THAN_6_LABELS)
+        }
+        requireLocalized(
             if (kind == FamilyListKind.SHOPPING) recipient == null
             else
                 recipient in
@@ -61,7 +68,7 @@ data class FamilyListItem(
                         AppointmentRecipient.BOTH_CHILDREN,
                     )
         ) {
-            "Bitte ein Kind oder beide Kinder auswählen."
+            message(TextKey.PLEASE_SELECT_ONE_CHILD_OR_BOTH_CHILDREN)
         }
     }
 }
@@ -130,14 +137,18 @@ fun matchesListLabels(
 
 fun starterLabels(group: LabelGroup): List<FamilyLabel> =
     when (group) {
-        LabelGroup.SHOPPING -> listOf("supermarkt" to "Supermarkt", "drogerie" to "Drogerie")
+        LabelGroup.SHOPPING ->
+            listOf(
+                "supermarkt" to text(TextKey.SUPERMARKET),
+                "drogerie" to text(TextKey.PHARMACY_TOILETRIES),
+            )
         LabelGroup.OCCASION ->
             listOf(
-                "weihnachten" to "Weihnachten",
-                "ostern" to "Ostern",
-                "geburtstag" to "Geburtstag",
+                "weihnachten" to text(TextKey.CHRISTMAS),
+                "ostern" to text(TextKey.EASTER),
+                "geburtstag" to text(TextKey.BIRTHDAY),
             )
-        LabelGroup.GIVER -> listOf("oma" to "Oma", "opa" to "Opa")
+        LabelGroup.GIVER -> listOf("oma" to text(TextKey.GRANDMA), "opa" to text(TextKey.GRANDPA))
     }.mapIndexed { index, (key, name) ->
         FamilyLabel(
             "preset_${group.name}_$key",

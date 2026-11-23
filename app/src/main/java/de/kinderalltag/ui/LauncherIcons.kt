@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import de.kinderalltag.text.*
 
 // Keep these component names stable: launchers can retain references across app updates.
 internal val AppThemeId.launcherAlias: String
@@ -74,7 +75,7 @@ internal object LauncherIcons {
             true
         } catch (error: RuntimeException) {
             // Keep the selected in-app theme; retry icon reconciliation on the next process start.
-            Log.w("LauncherIcons", "Launcher-Symbol konnte nicht aktualisiert werden", error)
+            Log.w("LauncherIcons", text(TextKey.THE_LAUNCHER_ICON_COULD_NOT_BE_UPDATED), error)
             false
         }
     }

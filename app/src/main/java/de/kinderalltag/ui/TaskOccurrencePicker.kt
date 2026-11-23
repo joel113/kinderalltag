@@ -14,6 +14,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import de.kinderalltag.data.*
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -112,7 +113,10 @@ internal fun TaskOccurrenceChoices(
                         else if (
                             Schedule.activeCompletions(state.events, occurrence.id).isNotEmpty()
                         )
-                            Text("Bereits bestätigt", style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                text(TextKey.ALREADY_CONFIRMED),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                     }
                 }
             }
@@ -147,7 +151,7 @@ private fun TaskOccurrenceChoicesPreview() {
         Surface(color = AppTheme.colors.background) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Vitamin D", style = MaterialTheme.typography.titleLarge)
-                Text("Welche Ausführung?", style = MaterialTheme.typography.titleMedium)
+                Text(text(TextKey.WHICH_OCCURRENCE), style = MaterialTheme.typography.titleMedium)
                 TaskOccurrenceChoices(
                     choices,
                     choices.first().id,

@@ -11,14 +11,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.kinderalltag.data.FamilyState
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.util.UUID
 
 @Composable
 internal fun ListLabelSettings(state: FamilyState, vm: FamilyViewModel, busy: Boolean) {
     var open by remember { mutableStateOf(false) }
-    SettingsSection("Labels", Icons.AutoMirrored.Filled.Label, AppTheme.colors.accent) {
-        Text("Gemeinsame Labels für eure Einkäufe, Geschenkanlässe und Schenkenden.")
-        OutlinedButton(onClick = { open = true }) { Text("Labels verwalten") }
+    SettingsSection(text(TextKey.LABELS), Icons.AutoMirrored.Filled.Label, AppTheme.colors.accent) {
+        Text(text(TextKey.SHARED_LABELS_FOR_YOUR_SHOPPING_GIFT_OCCASIONS_AND_GIFT_GIVERS))
+        OutlinedButton(onClick = { open = true }) { Text(text(TextKey.MANAGE_LABELS)) }
     }
     if (open) LabelManager(state, vm, busy) { open = false }
 }
@@ -37,8 +38,8 @@ private fun LabelManager(
     LaunchedEffect(group, editing) { vm.listError.value = null }
     val online = state.loaded && !state.fromCache && !state.pending && state.error == null && !busy
     ItemDetailsDialog(
-        "Labels verwalten",
-        "Einstellungen",
+        text(TextKey.MANAGE_LABELS),
+        text(TextKey.SETTINGS),
         onDismiss,
         busy,
         actions = {
@@ -46,7 +47,7 @@ private fun LabelManager(
                 secondary =
                     listOf(
                         DetailActionSpec(
-                            "Neues Label",
+                            text(TextKey.NEW_LABEL),
                             Icons.Default.Add,
                             online,
                             onClick = {
@@ -55,7 +56,7 @@ private fun LabelManager(
                             },
                         ),
                         DetailActionSpec(
-                            "Vorschläge",
+                            text(TextKey.SUGGESTIONS),
                             Icons.Default.AutoAwesome,
                             online,
                             onClick = { vm.addListStarters(group) },
@@ -74,15 +75,15 @@ private fun LabelManager(
             }
         }
         Text(
-            "Archivierte Labels bleiben an bestehenden Einträgen und im Verlauf erhalten. „Vorschläge“ ergänzt nur fehlende Startlabels.",
+            text(TextKey.ARCHIVED_LABELS_STAY_ON_EXISTING_ENTRIES_AND_IN_THE_HISTORY_SUGGESTIONS),
             style = MaterialTheme.typography.bodySmall,
         )
         val labels = state.listLabels.filter { it.group == group }.sortedBy { it.name }
         if (labels.isEmpty())
-            Text("Noch keine Labels. Lege eigene an oder verwende die Vorschläge.")
+            Text(text(TextKey.NO_LABELS_YET_CREATE_YOUR_OWN_OR_USE_THE_SUGGESTIONS))
         labels.forEach { label ->
             DetailSection(
-                label.name + if (!label.active) " (archiviert)" else "",
+                label.name + if (!label.active) text(TextKey.ARCHIVED) else "",
                 colorForLabel(label),
             ) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -93,20 +94,19 @@ private fun LabelManager(
                             creating = false
                         },
                     ) {
-                        Text("Bearbeiten")
+                        Text(text(TextKey.EDIT))
                     }
                     TextButton(
                         enabled = online,
                         onClick = { vm.saveListLabel(label.copy(active = !label.active), false) {} },
                     ) {
-                        Text(if (label.active) "Archivieren" else "Aktivieren")
+                        Text(if (label.active) text(TextKey.ARCHIVE) else text(TextKey.ENABLE))
                     }
                 }
             }
         }
         saveError?.let { DetailNotice(it) }
-        if (!online)
-            DetailNotice("Zum Verwalten von Labels ist eine aktuelle Verbindung erforderlich.")
+        if (!online) DetailNotice(text(TextKey.MANAGING_LABELS_REQUIRES_A_CURRENT_CONNECTION))
     }
     editing?.let { label ->
         key(label.id) {
@@ -117,7 +117,7 @@ private fun LabelManager(
                 creating ||
                     state.listLabels.firstOrNull { it.id == label.id }?.version == label.version
             ItemDetailsDialog(
-                if (creating) "Neues Label" else "Label bearbeiten",
+                if (creating) text(TextKey.NEW_LABEL) else text(TextKey.EDIT_LABEL),
                 labelGroupTitle(label.group),
                 { editing = null },
                 busy,
@@ -128,14 +128,14 @@ private fun LabelManager(
                             try {
                                 val updated = label.copy(name = name.trim(), color = color)
                                 updated.validate()
-                                require(
+                                requireLocalized(
                                     state.listLabels.none {
                                         it.id != label.id &&
                                             it.group == label.group &&
                                             it.name.equals(updated.name, ignoreCase = true)
                                     }
                                 ) {
-                                    "Dieses Label gibt es bereits."
+                                    message(TextKey.THIS_LABEL_ALREADY_EXISTS)
                                 }
                                 vm.saveListLabel(updated, creating) { editing = null }
                             } catch (e: IllegalArgumentException) {
@@ -144,30 +144,30 @@ private fun LabelManager(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Speichern")
+                        Text(text(TextKey.SAVE))
                     }
                 },
             ) {
                 OutlinedTextField(
                     name,
                     { name = it },
-                    label = { Text("Name") },
+                    label = { Text(text(TextKey.NAME)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
-                Text("Farbe")
+                Text(text(TextKey.COLOUR))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     BearColor.entries.forEach { choice ->
                         LabelChip(
                             label.copy(
                                 name =
                                     when (choice) {
-                                        BearColor.BLUE -> "Blau"
-                                        BearColor.ROSE -> "Rosa"
-                                        BearColor.GREEN -> "Grün"
-                                        BearColor.HONEY -> "Gelb"
-                                        BearColor.BROWN -> "Braun"
-                                        BearColor.PURPLE -> "Lila"
+                                        BearColor.BLUE -> text(TextKey.BLUE)
+                                        BearColor.ROSE -> text(TextKey.PINK)
+                                        BearColor.GREEN -> text(TextKey.GREEN)
+                                        BearColor.HONEY -> text(TextKey.YELLOW)
+                                        BearColor.BROWN -> text(TextKey.BROWN)
+                                        BearColor.PURPLE -> text(TextKey.PURPLE)
                                     },
                                 color = choice,
                             ),
@@ -179,7 +179,7 @@ private fun LabelManager(
                 }
                 saveError?.let { DetailNotice(it) }
                 if (!fresh)
-                    DetailNotice("Dieses Label wurde geändert. Bitte schließen und neu öffnen.")
+                    DetailNotice(text(TextKey.THIS_LABEL_HAS_CHANGED_PLEASE_CLOSE_AND_REOPEN_IT))
                 error?.let { DetailNotice(it) }
             }
         }

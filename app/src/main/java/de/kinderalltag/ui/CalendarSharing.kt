@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.core.content.FileProvider
 import de.kinderalltag.domain.AppointmentOccurrence
 import de.kinderalltag.domain.CalendarExchange
+import de.kinderalltag.text.*
 import java.io.File
 import java.util.UUID
 
@@ -31,11 +32,16 @@ internal fun shareAppointment(
                 .putExtra(Intent.EXTRA_STREAM, uri)
                 .putExtra(Intent.EXTRA_SUBJECT, appointment.details.title)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        send.clipData = ClipData.newUri(context.contentResolver, "Termin", uri)
-        val chooser = Intent.createChooser(send, "Termin teilen")
+        send.clipData = ClipData.newUri(context.contentResolver, text(TextKey.APPOINTMENT), uri)
+        val chooser = Intent.createChooser(send, text(TextKey.SHARE_APPOINTMENT))
         if (context !is Activity) chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
     } catch (_: Exception) {
-        Toast.makeText(context, "Termin konnte nicht geteilt werden.", Toast.LENGTH_LONG).show()
+        Toast.makeText(
+                context,
+                text(TextKey.THE_APPOINTMENT_COULD_NOT_BE_SHARED),
+                Toast.LENGTH_LONG,
+            )
+            .show()
     }
 }

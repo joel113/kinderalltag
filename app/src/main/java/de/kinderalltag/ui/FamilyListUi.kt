@@ -22,6 +22,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.kinderalltag.data.FamilyState
 import de.kinderalltag.domain.*
+import de.kinderalltag.text.*
 import java.util.UUID
 
 internal data class ListEditTarget(val kind: FamilyListKind, val item: FamilyListItem? = null)
@@ -38,27 +39,29 @@ internal class FamilyListUiState {
 }
 
 internal fun listTitle(kind: FamilyListKind) =
-    if (kind == FamilyListKind.SHOPPING) "Einkaufsliste" else "Geschenkideen"
+    if (kind == FamilyListKind.SHOPPING) text(TextKey.SHOPPING_LIST) else text(TextKey.GIFT_IDEAS)
 
 internal fun labelGroupTitle(group: LabelGroup) =
     when (group) {
-        LabelGroup.SHOPPING -> "Einkaufslabels"
-        LabelGroup.OCCASION -> "Geschenkanlässe"
-        LabelGroup.GIVER -> "Schenkende"
+        LabelGroup.SHOPPING -> text(TextKey.SHOPPING_LABELS)
+        LabelGroup.OCCASION -> text(TextKey.GIFT_OCCASIONS)
+        LabelGroup.GIVER -> text(TextKey.GIFT_GIVERS)
     }
 
-private val shoppingThoughts =
-    listOf(
-        "Milch, Brot und ein bisschen Vorfreude: Gemeinsam bleibt der Kopf frei für eure Familienzeit.",
-        "Die kleinen Besorgungen stehen hier. Platz im Kopf bleibt für ein gemeinsames Abenteuer.",
-        "Ein gut gefüllter Einkaufskorb und Zeit für die Menschen, die euch am Herzen liegen.",
-    )
-private val giftThoughts =
-    listOf(
-        "Die schönsten Geschenkideen beginnen mit einem Gedanken an einen lieben Menschen.",
-        "Ein kleines Geschenk, ein großes Strahlen: Hier dürfen eure Ideen wachsen.",
-        "Manche Ideen brauchen nur einen Platz, bis der richtige Moment zum Schenken kommt.",
-    )
+private val shoppingThoughts
+    get() =
+        listOf(
+            text(TextKey.MILK_BREAD_AND_A_LITTLE_ANTICIPATION_KEEP_YOUR_MINDS_FREE_FOR_FAMILY_TIM),
+            text(TextKey.THE_LITTLE_ERRANDS_GO_HERE_LEAVE_ROOM_IN_YOUR_MIND_FOR_A_FAMILY_ADVENTUR),
+            text(TextKey.A_WELL_FILLED_SHOPPING_BASKET_AND_TIME_FOR_THE_PEOPLE_YOU_LOVE),
+        )
+private val giftThoughts
+    get() =
+        listOf(
+            text(TextKey.THE_BEST_GIFT_IDEAS_START_WITH_A_THOUGHT_ABOUT_SOMEONE_YOU_LOVE),
+            text(TextKey.A_LITTLE_GIFT_A_BIG_SMILE_LET_YOUR_IDEAS_GROW_HERE),
+            text(TextKey.SOME_IDEAS_JUST_NEED_A_HOME_UNTIL_THE_RIGHT_MOMENT_TO_GIVE_THEM),
+        )
 
 @Composable
 internal fun FamilyListPage(
@@ -115,15 +118,15 @@ internal fun FamilyListPage(
         if (showIntroduction)
             item {
                 AppBanner(
-                    if (kind == FamilyListKind.SHOPPING) "Eure Einkaufsliste"
-                    else "Eure Geschenkideen",
+                    if (kind == FamilyListKind.SHOPPING) text(TextKey.YOUR_SHOPPING_LIST)
+                    else text(TextKey.YOUR_GIFT_IDEAS),
                     thought,
                 )
             }
         if (kind == FamilyListKind.GIFTS)
             item {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(child == null, { child = null }, label = { Text("Alle") })
+                    FilterChip(child == null, { child = null }, label = { Text(text(TextKey.ALL)) })
                     state.children.forEach { kid ->
                         FilterChip(child == kid.id, { child = kid.id }, label = { Text(kid.name) })
                     }
@@ -141,7 +144,10 @@ internal fun FamilyListPage(
         if (applicable.isNotEmpty())
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Nach Labels filtern", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text(TextKey.FILTER_BY_LABELS),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
                     LabelGroup.entries.forEach { group ->
                         val groupLabels = applicable.filter { it.group == group }
                         if (groupLabels.isNotEmpty()) {
@@ -166,22 +172,24 @@ internal fun FamilyListPage(
                     }
                     if (labels.isNotEmpty())
                         TextButton(onClick = { labels = arrayListOf() }) {
-                            Text("Alle Labels anzeigen")
+                            Text(text(TextKey.SHOW_ALL_LABELS))
                         }
                 }
             }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("${open.size} offen", fontWeight = FontWeight.SemiBold)
+                Text(text(TextKey.OPEN_50DD9F, open.size), fontWeight = FontWeight.SemiBold)
                 if (open.size > 1)
                     Text(
-                        if (reorder.saving) "Reihenfolge wird gespeichert …"
+                        if (reorder.saving) text(TextKey.SAVING_ORDER)
                         else if (fullOrder.size > MAX_LIST_ORDER_ITEMS)
-                            "Die Liste ist zu groß für die manuelle Sortierung."
+                            text(TextKey.THE_LIST_IS_TOO_LARGE_FOR_MANUAL_SORTING)
                         else if (!canReorder && !busy)
-                            "Zum Sortieren ist eine aktuelle Verbindung erforderlich."
+                            text(TextKey.SORTING_REQUIRES_A_CURRENT_CONNECTION)
                         else
-                            "Zum Sortieren den Griff gedrückt halten und verschieben. Antippen zeigt Pfeile zum Verschieben.",
+                            text(
+                                TextKey.TO_SORT_HOLD_THE_HANDLE_AND_DRAG_TAP_IT_FOR_UP_DOWN_ARROWS
+                            ),
                         style = MaterialTheme.typography.bodySmall,
                     )
             }
@@ -190,8 +198,8 @@ internal fun FamilyListPage(
             item {
                 Text(
                     if (kind == FamilyListKind.SHOPPING)
-                        "Hier ist alles besorgt. Neue Einkäufe könnt ihr mit + Einkauf ergänzen."
-                    else "Hier ist Platz für eure nächsten Geschenkideen."
+                        text(TextKey.EVERYTHING_IS_BOUGHT_ADD_NEW_ITEMS_WITH_SHOPPING)
+                    else text(TextKey.HERE_S_ROOM_FOR_YOUR_NEXT_GIFT_IDEAS)
                 )
             }
         items(open, key = { it.id }) { item ->
@@ -210,7 +218,13 @@ internal fun FamilyListPage(
         }
         item {
             TextButton(onClick = { showBought = !showBought }) {
-                Text("Gekauft (${bought.size}) ${if (showBought) "ausblenden" else "anzeigen"}")
+                Text(
+                    text(
+                        TextKey.BOUGHT_5F96A7,
+                        bought.size,
+                        if (showBought) text(TextKey.HIDE) else text(TextKey.SHOW),
+                    )
+                )
             }
         }
         if (showBought)
@@ -238,7 +252,7 @@ internal fun LabelChip(label: FamilyLabel, selected: Boolean, onClick: () -> Uni
     FilterChip(
         selected,
         onClick,
-        label = { Text(label.name + if (!label.active) " (archiviert)" else "") },
+        label = { Text(label.name + if (!label.active) text(TextKey.ARCHIVED) else "") },
         colors =
             FilterChipDefaults.filterChipColors(
                 selectedContainerColor = color.copy(alpha = 0.12f),
@@ -279,7 +293,7 @@ internal fun FamilyListCard(
                 enabled = !busy && state.authorized,
                 modifier =
                     Modifier.semanticsLabel(
-                        "${item.title}: ${if (bought) "wieder öffnen" else "als gekauft markieren"}"
+                        "${item.title}: ${if (bought) text(TextKey.REOPEN_3CC598) else text(TextKey.MARK_AS_BOUGHT_5ACF70)}"
                     ),
             )
             Column(
@@ -340,14 +354,14 @@ internal fun LazyListScope.shoppingHome(state: FamilyState, vm: FamilyViewModel,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Aktuelle Einkaufsliste",
+                text(TextKey.CURRENT_SHOPPING_LIST),
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
             FilledTonalButton(onClick = { vm.listUi.voiceImportOpen = true }) {
                 Icon(Icons.Default.Add, null)
-                Text("Einkauf")
+                Text(text(TextKey.SHOPPING_ITEM))
             }
         }
     }
@@ -359,7 +373,7 @@ internal fun LazyListScope.shoppingHome(state: FamilyState, vm: FamilyViewModel,
             false,
             state.listOrders.firstOrNull { it.kind == FamilyListKind.SHOPPING }?.itemIds.orEmpty(),
         )
-    if (open.isEmpty()) item { Text("Alles besorgt – eure Einkaufsliste ist leer.") }
+    if (open.isEmpty()) item { Text(text(TextKey.EVERYTHING_BOUGHT_YOUR_SHOPPING_LIST_IS_EMPTY)) }
     items(open, key = { "shopping:${it.id}" }) { item ->
         FamilyListCard(item, state, busy, { vm.listUi.selected = item }, { vm.buy(item, true) })
     }
@@ -392,8 +406,8 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
                     primary = {
                         DetailAction(
                             if (activePurchases(state.listActivity, item.id).isEmpty())
-                                "Als gekauft markieren"
-                            else "Wieder öffnen",
+                                text(TextKey.MARK_AS_BOUGHT)
+                            else text(TextKey.REOPEN),
                             if (activePurchases(state.listActivity, item.id).isEmpty())
                                 Icons.Default.Check
                             else Icons.Default.Restore,
@@ -407,7 +421,7 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
                     secondary =
                         listOf(
                             DetailActionSpec(
-                                "Bearbeiten",
+                                text(TextKey.EDIT),
                                 Icons.Default.Edit,
                                 canManage,
                                 onClick = {
@@ -418,7 +432,7 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
                         ),
                     deleteAction =
                         DetailActionSpec(
-                            "Löschen",
+                            text(TextKey.DELETE),
                             Icons.Default.DeleteOutline,
                             canManage,
                             onClick = { deleting = true },
@@ -426,25 +440,25 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
                 )
             },
         ) {
-            DetailSection("Auf einen Blick") {
+            DetailSection(text(TextKey.AT_A_GLANCE)) {
                 item.recipient?.let {
                     DetailValue(
                         Icons.Default.Face,
-                        "Für",
+                        text(TextKey.FOR),
                         appointmentRecipientName(it, state.sections),
                     )
                 }
                 DetailValue(
                     Icons.Default.CheckCircle,
-                    "Status",
-                    if (activePurchases(state.listActivity, item.id).isEmpty()) "Offen"
-                    else "Gekauft",
+                    text(TextKey.STATUS),
+                    if (activePurchases(state.listActivity, item.id).isEmpty()) text(TextKey.OPEN)
+                    else text(TextKey.BOUGHT),
                 )
                 LabelGroup.entries.forEach { group ->
                     val names =
                         state.listLabels
                             .filter { it.id in item.labelIds && it.group == group }
-                            .map { it.name + if (!it.active) " (archiviert)" else "" }
+                            .map { it.name + if (!it.active) text(TextKey.ARCHIVED) else "" }
                     if (names.isNotEmpty())
                         DetailValue(
                             Icons.AutoMirrored.Filled.Label,
@@ -454,23 +468,29 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
                 }
             }
             if (item.notes.isNotBlank())
-                DetailSection("Notizen", AppTheme.colors.background) { Text(item.notes) }
+                DetailSection(text(TextKey.NOTES), AppTheme.colors.background) { Text(item.notes) }
             saveError?.let { DetailNotice(it) }
             if (!fresh)
-                DetailNotice("Dieser Eintrag wurde geändert. Bitte schließen und neu öffnen.")
+                DetailNotice(text(TextKey.THIS_ENTRY_HAS_CHANGED_PLEASE_CLOSE_AND_REOPEN_IT_2192A4))
             if (state.fromCache)
                 DetailNotice(
-                    "Gespeicherter Stand. Kaufen und Wiederöffnen werden offline vorgemerkt; Bearbeiten und Löschen benötigen eine Verbindung."
+                    text(
+                        TextKey
+                            .SAVED_DATA_BUYING_AND_REOPENING_ARE_QUEUED_OFFLINE_EDITING_AND_DELETING
+                    )
                 )
         }
         if (deleting)
             AlertDialog(
                 onDismissRequest = { if (!busy) deleting = false },
-                title = { Text("Eintrag löschen?") },
+                title = { Text(text(TextKey.DELETE_ENTRY)) },
                 text = {
                     Column {
                         Text(
-                            "„${item.title}“ wird im Papierkorb aufbewahrt. Der Kaufstatus und der Verlauf bleiben erhalten."
+                            text(
+                                TextKey.IS_KEPT_IN_TRASH_PURCHASE_STATUS_AND_HISTORY_ARE_PRESERVED,
+                                item.title,
+                            )
                         )
                         saveError?.let { Text(it, color = StatusColors.error) }
                     }
@@ -485,12 +505,12 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
                             }
                         },
                     ) {
-                        Text("Löschen", color = StatusColors.error)
+                        Text(text(TextKey.DELETE), color = StatusColors.error)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { deleting = false }, enabled = !busy) {
-                        Text("Abbrechen")
+                        Text(text(TextKey.CANCEL))
                     }
                 },
             )
@@ -534,8 +554,9 @@ private fun FamilyListEditor(
             (existing == null || (!state.fromCache && !state.pending && state.error == null))
     ItemDetailsDialog(
         if (existing == null)
-            if (target.kind == FamilyListKind.SHOPPING) "Neuer Einkauf" else "Neue Geschenkidee"
-        else "Eintrag bearbeiten",
+            if (target.kind == FamilyListKind.SHOPPING) text(TextKey.NEW_SHOPPING_ITEM)
+            else text(TextKey.NEW_GIFT_IDEA)
+        else text(TextKey.EDIT_ENTRY),
         listTitle(target.kind),
         onDismiss,
         busy,
@@ -564,21 +585,27 @@ private fun FamilyListEditor(
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (busy) "Speichert …" else "Speichern")
+                Text(if (busy) text(TextKey.SAVING) else text(TextKey.SAVE))
             }
         },
     ) {
-        DictationField(title, { title = it }, "Titel", Modifier.fillMaxWidth(), enabled = !busy)
+        DictationField(
+            title,
+            { title = it },
+            text(TextKey.TITLE),
+            Modifier.fillMaxWidth(),
+            enabled = !busy,
+        )
         DictationField(
             notes,
             { notes = it },
-            "Notizen (optional)",
+            text(TextKey.NOTES_OPTIONAL),
             Modifier.fillMaxWidth(),
             notes = true,
             enabled = !busy,
         )
         if (target.kind == FamilyListKind.GIFTS)
-            DetailSection("Für wen?", AppTheme.colors.background) {
+            DetailSection(text(TextKey.WHO_IS_IT_FOR), AppTheme.colors.background) {
                 listOf(
                         AppointmentRecipient.FERDINAND,
                         AppointmentRecipient.JOHANN,
@@ -593,7 +620,7 @@ private fun FamilyListEditor(
                     }
             }
         Text(
-            "Bis zu 6 Labels insgesamt. Labels verwaltet ihr gemeinsam in den Einstellungen.",
+            text(TextKey.UP_TO_6_LABELS_IN_TOTAL_YOU_CAN_MANAGE_SHARED_LABELS_IN_SETTINGS),
             style = MaterialTheme.typography.bodySmall,
         )
         LabelGroup.entries
@@ -609,7 +636,7 @@ private fun FamilyListEditor(
                             .sortedBy { it.name }
                     if (labels.isEmpty())
                         Text(
-                            "Labels könnt ihr in den Einstellungen anlegen.",
+                            text(TextKey.YOU_CAN_CREATE_LABELS_IN_SETTINGS),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -626,7 +653,8 @@ private fun FamilyListEditor(
                 }
             }
         saveError?.let { DetailNotice(it) }
-        if (stale) DetailNotice("Dieser Eintrag wurde geändert. Bitte schließen und neu öffnen.")
+        if (stale)
+            DetailNotice(text(TextKey.THIS_ENTRY_HAS_CHANGED_PLEASE_CLOSE_AND_REOPEN_IT_2192A4))
         error?.let { DetailNotice(it) }
     }
 }

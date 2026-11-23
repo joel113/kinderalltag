@@ -8,6 +8,7 @@ import de.kinderalltag.data.CalendarInbox
 import de.kinderalltag.data.FamilyRepository
 import de.kinderalltag.notifications.ActivityNotifications
 import de.kinderalltag.notifications.ReminderScheduler
+import de.kinderalltag.ui.AppStrings
 import de.kinderalltag.ui.LauncherIcons
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
@@ -21,6 +22,7 @@ class KinderApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppStrings.install(this)
         LauncherIcons.syncSavedTheme(this)
         ReminderScheduler.createChannel(this)
         ActivityNotifications.createChannel(this)

@@ -89,9 +89,10 @@ private fun themePreviewState(): FamilyState {
 
 @Preview(name = "Design · Heute", widthDp = 390, heightDp = 820)
 @Preview(name = "Design · Heute · große Schrift", widthDp = 320, heightDp = 820, fontScale = 1.5f)
+@Preview(name = "Home · English", locale = "en", widthDp = 390, heightDp = 820)
 @Composable
 private fun ThemeHomePreview(@PreviewParameter(ThemePreviewProvider::class) theme: AppThemeId) {
-    KinderTheme(theme) {
+    PreviewKinderTheme(theme) {
         AppBackground(Modifier.fillMaxSize()) {
             Checklist(
                 themePreviewState(),
@@ -107,9 +108,10 @@ private fun ThemeHomePreview(@PreviewParameter(ThemePreviewProvider::class) them
 }
 
 @Preview(name = "Design · Darstellung", widthDp = 390, heightDp = 820)
+@Preview(name = "Appearance · English", locale = "en", widthDp = 390, heightDp = 820)
 @Composable
 private fun ThemeSettingsPreview(@PreviewParameter(ThemePreviewProvider::class) theme: AppThemeId) {
-    KinderTheme(theme) {
+    PreviewKinderTheme(theme) {
         AppBackground(Modifier.fillMaxSize()) {
             Column(
                 Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
@@ -128,11 +130,12 @@ private fun ThemeSettingsPreview(@PreviewParameter(ThemePreviewProvider::class) 
 }
 
 @Preview(name = "Design · Aufgabendetails", widthDp = 390, heightDp = 820)
+@Preview(name = "Task details · English", locale = "en", widthDp = 390, heightDp = 820)
 @Composable
 private fun ThemeTaskDetailsPreview(
     @PreviewParameter(ThemePreviewProvider::class) theme: AppThemeId
 ) {
-    KinderTheme(theme) {
+    PreviewKinderTheme(theme) {
         OccurrenceDialog(
             Occurrence(themePreviewTask, themePreviewDay, themePreviewTask.times.single()),
             themePreviewState(),
@@ -149,9 +152,10 @@ private fun ThemeTaskDetailsPreview(
 }
 
 @Preview(name = "Design · Monats-Tracker", widthDp = 390, heightDp = 820)
+@Preview(name = "Tracker · English", locale = "en", widthDp = 390, heightDp = 820)
 @Composable
 private fun ThemeTrackerPreview(@PreviewParameter(ThemePreviewProvider::class) theme: AppThemeId) {
-    KinderTheme(theme) {
+    PreviewKinderTheme(theme) {
         AppBackground(Modifier.fillMaxSize()) {
             Column(Modifier.padding(20.dp)) {
                 TaskCompletionOverview(
@@ -169,7 +173,7 @@ private fun ThemeTrackerPreview(@PreviewParameter(ThemePreviewProvider::class) t
 private fun ThemeIllustrationsPreview(
     @PreviewParameter(ThemePreviewProvider::class) theme: AppThemeId
 ) {
-    KinderTheme(theme) {
+    PreviewKinderTheme(theme) {
         AppBackground(Modifier.fillMaxSize()) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(theme.label, style = MaterialTheme.typography.headlineMedium)
