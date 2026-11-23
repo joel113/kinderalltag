@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.*
 import kotlin.math.*
 
-// Original, scalable illustrations inspired by the soft animal portraits in animals.webp.
+// Scalable animal illustrations drawn with Compose Canvas.
 internal fun DrawScope.drawAnimalMotif(art: ThemeArtwork, c: AppPalette) {
     when (art) {
         ThemeArtwork.LION -> lion(c)
