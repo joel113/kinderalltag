@@ -344,9 +344,12 @@ service cloud.firestore {
               && get(/databases/$(database)/documents/households/family/revisions/$(d.sourceId)).data.taskId == d.itemId)
             || (d.type == 'APPOINTMENT' && d.childId == null && d.recipient in ['FERDINAND', 'JOHANN', 'BOTH_CHILDREN', 'HOUSEHOLD']
               && exists(/databases/$(database)/documents/households/family/appointmentSeries/$(d.sourceId))))
-          && ((d.action == 'EDIT' && d.scope in ['SINGLE', 'FOLLOWING'] && d.restoresId == null && d.actualStartAt > request.time
+          && ((d.action == 'EDIT' && d.scope in ['SINGLE', 'FOLLOWING'] && d.restoresId == null
+              && (d.actualStartAt > request.time
+                || (d.type == 'TASK' && d.scope == 'SINGLE'
+                  && get(/databases/$(database)/documents/households/family/revisions/$(d.sourceId)).data.frequency == 'ONCE'))
               && ((d.type == 'TASK' && validTaskSnapshot(d.task) && d.task.taskId == d.itemId && d.appointment == null
-                  && (d.scope != 'SINGLE' || (d.task.times.size() == 1 && d.replacementStartAt > request.time)))
+                  && (d.scope != 'SINGLE' || (d.task.times.size() == 1 && d.replacementStartAt is timestamp)))
                 || (d.type == 'APPOINTMENT' && d.task == null && validAppointmentSnapshot(d.appointment) && d.replacementStartAt > request.time)))
             || (d.action == 'DELETE' && d.task == null && d.appointment == null && d.restoresId == null)
             || (d.action == 'RESTORE' && d.task == null && d.appointment == null && text(d.restoresId, 100)

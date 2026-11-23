@@ -328,37 +328,42 @@ internal fun FamilyListDialogs(state: FamilyState, vm: FamilyViewModel) {
             { ui.selected = null },
             busy,
             actions = {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DetailAction(
-                        "Bearbeiten",
-                        Icons.Default.Edit,
-                        canManage,
-                        onClick = {
-                            ui.selected = null
-                            ui.editor = ListEditTarget(item.kind, item)
-                        },
-                    )
-                    DetailAction(
-                        "Löschen",
-                        Icons.Default.DeleteOutline,
-                        canManage,
-                        destructive = true,
-                        onClick = { deleting = true },
-                    )
-                }
-                OutlinedButton(
-                    onClick = {
-                        vm.buy(item, activePurchases(state.listActivity, item.id).isEmpty())
+                DetailActions(
+                    primary = {
+                        DetailAction(
+                            if (activePurchases(state.listActivity, item.id).isEmpty())
+                                "Als gekauft markieren"
+                            else "Wieder öffnen",
+                            if (activePurchases(state.listActivity, item.id).isEmpty())
+                                Icons.Default.Check
+                            else Icons.Default.Restore,
+                            fresh && !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                vm.buy(item, activePurchases(state.listActivity, item.id).isEmpty())
+                            },
+                        )
                     },
-                    enabled = fresh && !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        if (activePurchases(state.listActivity, item.id).isEmpty())
-                            "Als gekauft markieren"
-                        else "Wieder öffnen"
-                    )
-                }
+                    secondary =
+                        listOf(
+                            DetailActionSpec(
+                                "Bearbeiten",
+                                Icons.Default.Edit,
+                                canManage,
+                                onClick = {
+                                    ui.selected = null
+                                    ui.editor = ListEditTarget(item.kind, item)
+                                },
+                            )
+                        ),
+                    deleteAction =
+                        DetailActionSpec(
+                            "Löschen",
+                            Icons.Default.DeleteOutline,
+                            canManage,
+                            onClick = { deleting = true },
+                        ),
+                )
             },
         ) {
             DetailSection("Auf einen Blick") {

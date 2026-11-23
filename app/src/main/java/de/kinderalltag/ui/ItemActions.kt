@@ -5,6 +5,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +32,26 @@ internal data class TaskEditSelection(
     val scope: OperationScope,
     val version: Long,
 )
+
+internal fun taskEditBlockReason(
+    occurrence: Occurrence?,
+    revisions: List<TaskRevision>,
+    events: List<CareEvent>,
+    now: Instant,
+): String? =
+    when {
+        occurrence == null -> "Bitte eine kommende Ausführung auswählen."
+        Schedule.activeCompletions(events, occurrence.id).isNotEmpty() ->
+            "Diese Ausführung wurde bereits bestätigt und bleibt unverändert. Bitte eine unbestätigte Ausführung wählen."
+        occurrence.instant <= now &&
+            !isOneOffTaskSource(
+                revisions,
+                occurrence.revision.taskId,
+                occurrence.sourceRevisionId,
+            ) ->
+            "Die geplante Uhrzeit dieser Ausführung liegt bereits in der Vergangenheit. Aktuell lassen sich nur kommende Ausführungen bearbeiten."
+        else -> null
+    }
 
 internal fun taskOperation(
     occurrence: Occurrence,
@@ -119,6 +141,48 @@ internal fun taskActionOccurrences(
     return (live + resumed).distinctBy { it.id }.sortedBy { it.time }
 }
 
+internal fun initialTaskActionOccurrence(
+    target: ItemActionTarget,
+    state: FamilyState,
+    now: Instant,
+): Occurrence? {
+    val task = target.task?.revision ?: target.definition
+    return target.task
+        ?: task?.let { definition ->
+            val today = now.atZone(FAMILY_ZONE).toLocalDate()
+            val first = maxOf(today, definition.start)
+            val upcoming =
+                if (definition.active) state.futureTaskOccurrences(definition.taskId, now)
+                else {
+                    val schedule = definition.copy(active = true)
+                    val date = schedule.nextDueDate(first)
+                    listOfNotNull(date, date?.let { schedule.nextDueDate(it.plusDays(1)) })
+                        .flatMap { taskActionOccurrences(state, definition, it) }
+                }
+            upcoming.firstOrNull {
+                it.instant > now &&
+                    (target.deleting || Schedule.activeCompletions(state.events, it.id).isEmpty())
+            }
+                ?: definition
+                    .takeIf { it.frequency == Frequency.ONCE }
+                    ?.let {
+                        val dates =
+                            listOf(it.start) +
+                                state.itemOperations
+                                    .filter { operation ->
+                                        operation.type == ItemType.TASK &&
+                                            operation.itemId == it.taskId &&
+                                            operation.action == OperationAction.EDIT &&
+                                            operation.scope == OperationScope.SINGLE
+                                    }
+                                    .mapNotNull { operation -> operation.task?.start }
+                        dates.distinct().sortedDescending().firstNotNullOfOrNull { day ->
+                            taskActionOccurrences(state, it, day).firstOrNull()
+                        }
+                    }
+        }
+}
+
 @Composable
 internal fun ItemActionDialog(
     target: ItemActionTarget,
@@ -132,39 +196,34 @@ internal fun ItemActionDialog(
     val busy by vm.busy.collectAsStateWithLifecycle()
     val error by vm.operationError.collectAsStateWithLifecycle()
     val task = target.task?.revision ?: target.definition
-    val next =
-        remember(target) {
-            target.task
-                ?: task?.let { definition ->
-                    val today = now.atZone(FAMILY_ZONE).toLocalDate()
-                    val first = maxOf(today, definition.start)
-                    val upcoming =
-                        if (definition.active) state.futureTaskOccurrences(definition.taskId, now)
-                        else {
-                            val schedule = definition.copy(active = true)
-                            val date = schedule.nextDueDate(first)
-                            listOfNotNull(date, date?.let { schedule.nextDueDate(it.plusDays(1)) })
-                                .flatMap { taskActionOccurrences(state, definition, it) }
-                        }
-                    upcoming.firstOrNull {
-                        it.instant > now &&
-                            (target.deleting ||
-                                Schedule.activeCompletions(state.events, it.id).isEmpty())
-                    }
-                }
-        }
-    var date by
+    val next = remember(target) { initialTaskActionOccurrence(target, state, now) }
+    var cursor by
         remember(target) {
             mutableStateOf(
-                next?.date
-                    ?: target.appointment?.details?.date
-                    ?: task?.start?.takeIf { it >= now.atZone(FAMILY_ZONE).toLocalDate() }
-                    ?: now.atZone(FAMILY_ZONE).toLocalDate()
+                next?.instant
+                    ?: (target.appointment?.details?.date
+                            ?: task?.start
+                            ?: now.atZone(FAMILY_ZONE).toLocalDate())
+                        .atStartOfDay(FAMILY_ZONE)
+                        .toInstant()
             )
         }
+    var previousPages by remember(target) { mutableStateOf(emptyList<Instant>()) }
+    var showDateJump by remember(target) { mutableStateOf(false) }
+    val date = cursor.atZone(FAMILY_ZONE).toLocalDate()
     var selectedId by remember(target) { mutableStateOf(next?.id) }
-    val instances = task?.let { taskActionOccurrences(state, it, date) }.orEmpty()
-    val selected = instances.firstOrNull { it.id == selectedId } ?: instances.firstOrNull()
+    val choices =
+        remember(state, task, cursor) {
+            task?.let { taskActionChoices(state, it, cursor) }.orEmpty()
+        }
+    val instances = choices.take(TASK_OCCURRENCE_PAGE_SIZE)
+    val selected =
+        instances.firstOrNull { it.id == selectedId }
+            ?: instances.firstOrNull {
+                target.deleting ||
+                    taskEditBlockReason(it, state.revisions, state.events, now) == null
+            }
+            ?: instances.firstOrNull()
     val recurring =
         task?.let { definition ->
             state.revisions.any {
@@ -186,10 +245,8 @@ internal fun ItemActionDialog(
         }
     var confirming by remember(target) { mutableStateOf(false) }
     LaunchedEffect(target) { vm.operationError.value = null }
-    val editable =
-        selected?.let {
-            it.instant > now && Schedule.activeCompletions(state.events, it.id).isEmpty()
-        } ?: false
+    val editBlockReason = taskEditBlockReason(selected, state.revisions, state.events, now)
+    val editable = editBlockReason == null
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         title = { Text(if (target.deleting) "Löschen" else "Aufgabe bearbeiten") },
@@ -216,43 +273,93 @@ internal fun ItemActionDialog(
                             )
                         }
                 if (task != null && scope != OperationScope.ALL) {
-                    DatePickerField(
-                        "Ausführung am",
-                        date,
-                        { chosen ->
-                            chosen?.let {
-                                date = it
-                                selectedId = null
-                                confirming = false
-                            }
-                        },
-                        minDate =
-                            if (target.deleting) null else now.atZone(FAMILY_ZONE).toLocalDate(),
-                    )
-                    instances.forEach { occurrence ->
-                        FilterChip(
-                            selected?.id == occurrence.id,
-                            {
-                                selectedId = occurrence.id
-                                confirming = false
-                            },
-                            label = {
-                                Text(
-                                    formats.time(occurrence.time) +
-                                        " · " +
-                                        occurrence.revision.title +
-                                        if (
-                                            Schedule.activeCompletions(state.events, occurrence.id)
-                                                .isNotEmpty()
-                                        )
-                                            " · bestätigt"
-                                        else ""
-                                )
-                            },
+                    if (recurring) {
+                        Text("Welche Ausführung?", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            if (target.deleting)
+                                "Wähle Datum und Uhrzeit des Eintrags, den du entfernen möchtest."
+                            else
+                                "Wähle die Ausführung, die du ändern möchtest. Das neue Datum legst du anschließend fest.",
+                            style = MaterialTheme.typography.bodySmall,
                         )
+                        TaskOccurrenceChoices(
+                            instances,
+                            selected?.id,
+                            state,
+                            now,
+                            target.deleting,
+                            !busy,
+                        ) {
+                            selectedId = it.id
+                            confirming = false
+                        }
+                        if (instances.isEmpty()) Text("Ab diesem Datum gibt es keine Ausführungen.")
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            OutlinedButton(
+                                enabled = !busy && previousPages.isNotEmpty(),
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    cursor = previousPages.last()
+                                    previousPages = previousPages.dropLast(1)
+                                    selectedId = null
+                                    confirming = false
+                                },
+                            ) {
+                                Icon(Icons.Default.ChevronLeft, null)
+                                Text("Zurück")
+                            }
+                            OutlinedButton(
+                                enabled = !busy && choices.size > TASK_OCCURRENCE_PAGE_SIZE,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    previousPages = previousPages + cursor
+                                    cursor = instances.last().instant.plusNanos(1)
+                                    selectedId = null
+                                    confirming = false
+                                },
+                            ) {
+                                Text("Weitere")
+                                Icon(Icons.Default.ChevronRight, null)
+                            }
+                        }
+                        TextButton(onClick = { showDateJump = !showDateJump }, enabled = !busy) {
+                            Text(
+                                if (showDateJump) "Datumssuche schließen"
+                                else "Zu einem anderen Datum …"
+                            )
+                        }
+                        if (showDateJump)
+                            DatePickerField(
+                                "Ausführungen anzeigen ab",
+                                date,
+                                { chosen ->
+                                    chosen?.let {
+                                        previousPages = previousPages + cursor
+                                        cursor = it.atStartOfDay(FAMILY_ZONE).toInstant()
+                                        selectedId = null
+                                        confirming = false
+                                        showDateJump = false
+                                    }
+                                },
+                                enabled = !busy,
+                            )
+                    } else {
+                        selected?.let {
+                            Text(
+                                "${formats.fullDate(it.date)} · ${formats.time(it.time)}",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                        if (!target.deleting)
+                            Text(
+                                "Datum und Uhrzeit kannst du im nächsten Schritt ändern.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        if (selected == null) Text("Es gibt keine sichtbare Ausführung.")
                     }
-                    if (instances.isEmpty())
-                        Text("An diesem Tag gibt es keine sichtbare Ausführung.")
                 }
                 target.appointment?.let { appointment ->
                     Text(
@@ -263,10 +370,11 @@ internal fun ItemActionDialog(
                             "Ab ursprünglichem Termin: ${formats.date(appointment.originalDate)} · ${formats.time(appointment.originTime)}"
                         )
                 }
-                if (!target.deleting && selected != null && !editable)
-                    Text(
-                        "Begonnene oder bestätigte Ausführungen bleiben unverändert. Bitte eine kommende Ausführung wählen."
-                    )
+                if (!target.deleting && editBlockReason != null)
+                    Text(editBlockReason, color = MaterialTheme.colorScheme.error)
+                if (state.error != null) Text(state.error, color = MaterialTheme.colorScheme.error)
+                else if (state.fromCache)
+                    Text("Zum Speichern ist eine aktuelle Serververbindung erforderlich.")
                 if (target.deleting)
                     Text(
                         if (confirming)
@@ -286,13 +394,13 @@ internal fun ItemActionDialog(
                     ),
                 enabled =
                     !busy &&
-                        !state.fromCache &&
-                        state.error == null &&
                         (if (!target.deleting) editable
                         else
-                            scope == OperationScope.ALL ||
-                                selected != null ||
-                                target.appointment != null),
+                            !state.fromCache &&
+                                state.error == null &&
+                                (scope == OperationScope.ALL ||
+                                    selected != null ||
+                                    target.appointment != null)),
                 onClick = {
                     if (!target.deleting) {
                         selected?.let {
@@ -339,11 +447,7 @@ internal fun ItemActionDialog(
                 Text(
                     if (busy) "Speichert …"
                     else if (!target.deleting) "Weiter"
-                    else if (confirming) "Ja, löschen" else "Löschen …",
-                    color =
-                        if (busy || state.fromCache || state.error != null)
-                            androidx.compose.ui.graphics.Color.Unspecified
-                        else if (target.deleting) StatusColors.error else AppTheme.colors.primary,
+                    else if (confirming) "Ja, löschen" else "Löschen …"
                 )
             }
         },

@@ -210,63 +210,75 @@ internal fun AppointmentDialogs(
             { ui.selected = null },
             busy,
             actions = {
-                DetailAction(
-                    "Im Kalender speichern",
-                    Icons.Default.EventAvailable,
-                    visible && !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        saveAppointmentToCalendar(
-                            context,
-                            selected,
-                            appointmentRecipientName(details.recipient, state.sections),
+                DetailActions(
+                    primary = {
+                        DetailAction(
+                            "Im Kalender speichern",
+                            Icons.Default.EventAvailable,
+                            visible && !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                saveAppointmentToCalendar(
+                                    context,
+                                    selected,
+                                    appointmentRecipientName(details.recipient, state.sections),
+                                )
+                            },
                         )
                     },
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (future)
-                        DetailAction(
-                            "Bearbeiten",
-                            Icons.Default.Edit,
+                    secondary =
+                        buildList {
+                            if (future)
+                                add(
+                                    DetailActionSpec(
+                                        "Bearbeiten",
+                                        Icons.Default.Edit,
+                                        canManage,
+                                        onClick = {
+                                            ui.editor =
+                                                AppointmentEditTarget(
+                                                    selected,
+                                                    following,
+                                                    operationVersion = ui.selectedOperationVersion,
+                                                )
+                                            ui.selected = null
+                                        },
+                                    )
+                                )
+                            add(
+                                DetailActionSpec(
+                                    "Teilen",
+                                    Icons.Default.Share,
+                                    visible && !busy,
+                                    onClick = {
+                                        shareAppointment(
+                                            context,
+                                            selected,
+                                            appointmentRecipientName(
+                                                details.recipient,
+                                                state.sections,
+                                            ),
+                                        )
+                                    },
+                                )
+                            )
+                        },
+                    deleteAction =
+                        DetailActionSpec(
+                            "Löschen",
+                            Icons.Default.DeleteOutline,
                             canManage,
                             onClick = {
-                                ui.editor =
-                                    AppointmentEditTarget(
-                                        selected,
-                                        following,
-                                        operationVersion = ui.selectedOperationVersion,
+                                ui.deletion =
+                                    ItemActionTarget(
+                                        true,
+                                        appointment = selected,
+                                        expectedVersion = ui.selectedOperationVersion,
                                     )
                                 ui.selected = null
                             },
-                        )
-                    DetailAction(
-                        "Teilen",
-                        Icons.Default.Share,
-                        visible && !busy,
-                        onClick = {
-                            shareAppointment(
-                                context,
-                                selected,
-                                appointmentRecipientName(details.recipient, state.sections),
-                            )
-                        },
-                    )
-                    DetailAction(
-                        "Löschen",
-                        Icons.Default.DeleteOutline,
-                        canManage,
-                        destructive = true,
-                        onClick = {
-                            ui.deletion =
-                                ItemActionTarget(
-                                    true,
-                                    appointment = selected,
-                                    expectedVersion = ui.selectedOperationVersion,
-                                )
-                            ui.selected = null
-                        },
-                    )
-                }
+                        ),
+                )
             },
         ) {
             DetailSection("Auf einen Blick") {

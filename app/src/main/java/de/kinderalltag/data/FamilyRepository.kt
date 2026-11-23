@@ -404,22 +404,22 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                     } && request.task?.active == true
                 require(
                     (original != null &&
-                        original.instant > now &&
+                        (original.instant > now ||
+                            (request.scope == OperationScope.SINGLE &&
+                                isOneOffTaskSource(
+                                    state.revisions,
+                                    request.itemId,
+                                    request.sourceId,
+                                ))) &&
                         Schedule.activeCompletions(state.events, original.id).isEmpty()) ||
                         (resuming && Instant.ofEpochMilli(request.actualStartMillis) > now)
                 ) {
-                    "Begonnene oder bestätigte Ausführungen bleiben unverändert. Bitte eine kommende Ausführung wählen."
+                    "Bestätigte Ausführungen und begonnene Wiederholungen bleiben unverändert. Bitte eine kommende Ausführung wählen."
                 }
                 requireNotNull(request.task).validate()
                 if (request.scope == OperationScope.SINGLE)
-                    require(
-                        request.task.times.size == 1 &&
-                            request.task.start
-                                .atTime(request.task.times.single())
-                                .atZone(FAMILY_ZONE)
-                                .toInstant() > now
-                    ) {
-                        "Bitte Datum und Uhrzeit in der Zukunft wählen."
+                    require(request.task.times.size == 1) {
+                        "Bitte genau eine Uhrzeit für diese Ausführung wählen."
                     }
             } else {
                 requireNotNull(request.appointment).validate()

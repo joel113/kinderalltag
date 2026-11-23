@@ -42,23 +42,26 @@ private fun LabelManager(
         onDismiss,
         busy,
         actions = {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DetailAction(
-                    "Neues Label",
-                    Icons.Default.Add,
-                    online,
-                    onClick = {
-                        editing = FamilyLabel(UUID.randomUUID().toString(), group, "")
-                        creating = true
-                    },
-                )
-                DetailAction(
-                    "Vorschläge",
-                    Icons.Default.AutoAwesome,
-                    online,
-                    onClick = { vm.addListStarters(group) },
-                )
-            }
+            DetailActions(
+                secondary =
+                    listOf(
+                        DetailActionSpec(
+                            "Neues Label",
+                            Icons.Default.Add,
+                            online,
+                            onClick = {
+                                editing = FamilyLabel(UUID.randomUUID().toString(), group, "")
+                                creating = true
+                            },
+                        ),
+                        DetailActionSpec(
+                            "Vorschläge",
+                            Icons.Default.AutoAwesome,
+                            online,
+                            onClick = { vm.addListStarters(group) },
+                        ),
+                    )
+            )
         },
     ) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

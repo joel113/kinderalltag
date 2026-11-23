@@ -196,6 +196,116 @@ class ItemOperationsTest {
     }
 
     @Test
+    fun overdueOneOffCanMoveRepeatedlyWithoutGhostsAndPreservesCompletionSnapshots() {
+        val oneOff =
+            task.copy(frequency = Frequency.ONCE, start = day, times = listOf(LocalTime.of(8, 0)))
+        val original = Occurrence(oneOff, day, oneOff.times.single())
+        val first =
+            editTask(
+                scope = OperationScope.SINGLE,
+                anchor = original,
+                draft = oneOff.copy(id = "tomorrow", start = day.plusDays(1)),
+                hour = 12,
+            )
+        fun result(
+            date: LocalDate,
+            operations: List<ItemOperation>,
+            events: List<CareEvent> = emptyList(),
+        ) = ManagedTasks.occurrences(listOf(oneOff), events, operations, date)
+        assertTrue(result(day, listOf(first)).isEmpty())
+        val moved = result(day.plusDays(1), listOf(first)).single()
+        assertEquals(original.id, moved.id)
+        assertEquals(day, moved.originalDate)
+        val second =
+            first.copy(
+                id = "later",
+                actualDate = moved.date,
+                actualStartMillis = moved.instant.toEpochMilli(),
+                createdMillis = at(day.plusDays(1), 12).toEpochMilli(),
+                version = 13,
+                task = first.task!!.copy(id = "day-after", start = day.plusDays(2)),
+            )
+        assertTrue(result(day, listOf(first, second)).isEmpty())
+        assertTrue(result(day.plusDays(1), listOf(first, second)).isEmpty())
+        assertEquals(original.id, result(day.plusDays(2), listOf(first, second)).single().id)
+        val completed = complete(moved)
+        assertEquals(moved, result(moved.date, listOf(first, second), listOf(completed)).single())
+        assertTrue(result(day.plusDays(2), listOf(first, second), listOf(completed)).isEmpty())
+    }
+
+    @Test
+    fun overdueRecurringInstancesStayProtectedButOneOffsCanMoveBackwards() {
+        val recurring = original(hour = 8)
+        val edit =
+            editTask(
+                scope = OperationScope.SINGLE,
+                anchor = recurring,
+                draft =
+                    task.copy(
+                        frequency = Frequency.ONCE,
+                        start = day.plusDays(1),
+                        times = listOf(recurring.time),
+                    ),
+            )
+        assertTrue(tasks(day, listOf(edit)).any { it.id == recurring.id })
+        assertFalse(tasks(day.plusDays(1), listOf(edit)).any { it.id == recurring.id })
+        val oneOff =
+            task.copy(frequency = Frequency.ONCE, start = day, times = listOf(recurring.time))
+        val past = oneOff.copy(start = day.minusDays(1))
+        val backwards = edit.copy(task = past)
+        assertTrue(
+            ManagedTasks.occurrences(listOf(oneOff), emptyList(), listOf(backwards), day).isEmpty()
+        )
+        val moved =
+            ManagedTasks.occurrences(listOf(oneOff), emptyList(), listOf(backwards), past.start)
+                .single()
+        assertEquals(recurring.id, moved.id)
+        assertEquals(past.start, moved.date)
+        assertEquals(day, moved.originalDate)
+    }
+
+    @Test
+    fun futureRecurringExecutionCanMoveIntoThePastWithoutChangingOtherExecutionsOrCompletions() {
+        val anchor = original()
+        val pastDay = day.minusDays(3)
+        val edit =
+            editTask(
+                scope = OperationScope.SINGLE,
+                draft =
+                    task.copy(
+                        id = "backwards",
+                        frequency = Frequency.ONCE,
+                        start = pastDay,
+                        times = listOf(LocalTime.of(10, 0)),
+                    ),
+            )
+        assertFalse(tasks(day, listOf(edit)).any { it.id == anchor.id })
+        val moved = tasks(pastDay, listOf(edit)).single { it.id == anchor.id }
+        assertEquals(pastDay, moved.date)
+        assertEquals(day, moved.originalDate)
+        assertEquals(LocalTime.of(10, 0), moved.time)
+        assertEquals(tasks(day.plusDays(1)), tasks(day.plusDays(1), listOf(edit)))
+        val completion = complete(moved)
+        val laterEdit =
+            edit.copy(
+                id = "later",
+                createdMillis = at(hour = 14).toEpochMilli(),
+                task = edit.task!!.copy(start = day.plusDays(2)),
+            )
+        assertEquals(
+            moved,
+            tasks(pastDay, listOf(edit, laterEdit), listOf(completion)).single {
+                it.id == anchor.id
+            },
+        )
+        assertFalse(
+            tasks(day.plusDays(2), listOf(edit, laterEdit), listOf(completion)).any {
+                it.id == anchor.id
+            }
+        )
+    }
+
+    @Test
     fun singleTaskMoveKeepsIdentityAndDoesNotAffectOtherTimeOrDay() {
         val draft =
             task.copy(

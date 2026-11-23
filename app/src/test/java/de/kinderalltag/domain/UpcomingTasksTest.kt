@@ -40,6 +40,50 @@ class UpcomingTasksTest {
         )
 
     @Test
+    fun tasksAlreadyOnTheDisplayedDayDoNotAlsoAppearInTheFuturePreview() {
+        val recurring =
+            listOf(Frequency.DAILY, Frequency.WEEKS, Frequency.MONTHS).map {
+                task(it.name, frequency = it)
+            }
+        val tomorrow = task("once-tomorrow", day.plusDays(1), Frequency.ONCE)
+        val revisions = recurring + tomorrow
+        val due = ManagedTasks.occurrences(revisions, emptyList(), emptyList(), day)
+        listOf(emptyList(), due.map(::completed)).forEach { events ->
+            val result =
+                upcomingTaskOccurrences(
+                    revisions,
+                    events,
+                    emptyList(),
+                    day,
+                    5,
+                    excludedTaskIds = due.map { it.revision.taskId }.toSet(),
+                )
+            assertEquals(listOf(tomorrow.taskId), result.map { it.revision.taskId })
+        }
+    }
+
+    @Test
+    fun suppressingVisibleTasksStillFillsThePreviewLimitWithOtherTasks() {
+        val today = task("daily-today")
+        val futureRecurring = task("daily-starts-tomorrow", day.plusDays(1))
+        val futureOnce = task("once-tomorrow", day.plusDays(1), Frequency.ONCE, 10)
+        val result =
+            upcomingTaskOccurrences(
+                listOf(today, futureRecurring, futureOnce),
+                emptyList(),
+                emptyList(),
+                day,
+                2,
+                excludedTaskIds = setOf(today.taskId),
+            )
+        assertEquals(
+            listOf(futureRecurring.taskId, futureOnce.taskId),
+            result.map { it.revision.taskId },
+        )
+        assertTrue(result.all { it.date == day.plusDays(1) })
+    }
+
+    @Test
     fun ordersOneOffAndRecurringTasksChronologicallyAndLimitsDistinctTasks() {
         val daily = task("daily", hour = 0).copy(times = listOf(LocalTime.MIDNIGHT, LocalTime.NOON))
         val once = task("once", day.plusDays(1), Frequency.ONCE, 10)

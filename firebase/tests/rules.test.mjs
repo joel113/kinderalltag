@@ -332,13 +332,29 @@ test('future task edits accept a validated snapshot but cannot edit past anchors
   const future = Timestamp.fromMillis(Date.now() + 86400000);
   const edit = itemOperation('parent-a', { action: 'EDIT', scope: 'FOLLOWING', task: taskSnapshot(), actualStartAt: future });
   await assertSucceeds(writeOperation(db, 'edit', edit));
-  await assertSucceeds(writeOperation(db, 'single', { ...edit, scope: 'SINGLE', replacementStartAt: future, version: 2 }));
+  await assertSucceeds(writeOperation(db, 'single', { ...edit, scope: 'SINGLE', replacementStartAt: Timestamp.fromMillis(1), version: 2 }));
   for (const [index, extra] of [
     { actualStartAt: Timestamp.fromMillis(1) }, { scope: 'ALL' }, { task: { ...taskSnapshot(), taskId: 'wrong' } },
-    { scope: 'SINGLE', replacementStartAt: Timestamp.fromMillis(1) },
-    { task: { ...taskSnapshot(), times: ['25:00'] } }, { task: { ...taskSnapshot(), slotOrigins: ['source|999999'] } },
+        { task: { ...taskSnapshot(), times: ['25:00'] } }, { task: { ...taskSnapshot(), slotOrigins: ['source|999999'] } },
   ].entries()) await assertFails(writeOperation(db, `bad-edit-${index}`, { ...edit, version: 3, ...extra }));
 });
+test('overdue one-off tasks can move to past dates but only as a single edit', async () => {
+  const db = dbFor('parent-a');
+  await assertSucceeds(setDoc(doc(db, `${path}/revisions/source`), { ...revision('parent-a'), frequency: 'ONCE' }));
+  const future = Timestamp.fromMillis(Date.now() + 86400000);
+  const edit = itemOperation('parent-a', { action: 'EDIT', scope: 'SINGLE',
+    task: { ...taskSnapshot(), frequency: 'ONCE' }, replacementStartAt: future });
+  await assertSucceeds(writeOperation(db, 'postpone', edit));
+  await assertSucceeds(writeOperation(db, 'move-back', { ...edit, replacementStartAt: Timestamp.fromMillis(1), version: 2 }));
+  for (const [index, extra] of [
+    { scope: 'FOLLOWING' }, { scope: 'ALL' },
+    { replacementStartAt: null }, { task: { ...edit.task, times: ['08:00', '09:00'], slotOrigins: ['source|28800', 'source|32400'] } },
+    { sourceId: 'missing' },
+  ].entries()) await assertFails(writeOperation(db, `bad-postpone-${index}`, { ...edit, version: 3, ...extra }));
+  await assertFails(writeOperation(dbFor('stranger'), 'outsider-postpone', { ...edit, authorId: 'stranger', version: 3 }));
+  assert.equal((await getDoc(doc(db, `${path}/revisions/source`))).data().frequency, 'ONCE');
+});
+
 test('past appointment instances and whole series can be hidden and restored without modifying their records', async () => {
   const db = dbFor('parent-a');
   const source = appointment('parent-a');

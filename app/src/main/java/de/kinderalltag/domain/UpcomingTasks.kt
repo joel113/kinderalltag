@@ -13,6 +13,7 @@ fun upcomingTaskOccurrences(
     uid: String? = null,
     onlyMine: Boolean = false,
     days: Int = 7,
+    excludedTaskIds: Set<String> = emptySet(),
 ): List<Occurrence> {
     if (limit <= 0 || days <= 0) return emptyList()
     val through = after.plusDays(days.toLong())
@@ -21,6 +22,7 @@ fun upcomingTaskOccurrences(
     val operationsByTask = operations.filter { it.type == ItemType.TASK }.groupBy { it.itemId }
     return revisions
         .groupBy { it.taskId }
+        .filterKeys { it !in excludedTaskIds }
         .mapNotNull { (taskId, versions) ->
             val taskEvents =
                 events.filter { event ->

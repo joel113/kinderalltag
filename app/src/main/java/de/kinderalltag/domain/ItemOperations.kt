@@ -105,6 +105,9 @@ fun appointmentRootId(
     return seen.minOrNull() ?: id
 }
 
+fun isOneOffTaskSource(revisions: List<TaskRevision>, taskId: String, sourceId: String): Boolean =
+    revisions.any { it.id == sourceId && it.taskId == taskId && it.frequency == Frequency.ONCE }
+
 object ManagedTasks {
     private fun frozen(events: List<CareEvent>, revisions: List<TaskRevision>): List<Occurrence> =
         events
@@ -198,11 +201,11 @@ object ManagedTasks {
                 val current = result[edit.anchorId]
                 if (
                     edit.anchorId !in pinIds &&
-                        (edit.actualStartMillis > edit.createdMillis ||
+                        (isOneOffTaskSource(revisions, edit.itemId, edit.sourceId) ||
+                            edit.actualStartMillis > edit.createdMillis ||
                             (edit.actualStartMillis == 0L &&
                                 (current == null || current.instant > created)))
                 ) {
-                    result.remove(edit.anchorId)
                     val time = draft.times.singleOrNull() ?: return@forEach
                     val replacement =
                         Occurrence(
@@ -214,8 +217,8 @@ object ManagedTasks {
                             edit.anchorTime,
                             edit.sourceId,
                         )
-                    if (replacement.date == date && replacement.instant > created)
-                        result[replacement.id] = replacement
+                    result.remove(edit.anchorId)
+                    if (replacement.date == date) result[replacement.id] = replacement
                 }
             } else {
                 val relevant =

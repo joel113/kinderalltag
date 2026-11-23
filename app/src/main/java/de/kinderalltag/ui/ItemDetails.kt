@@ -14,7 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -94,7 +96,15 @@ internal fun ItemDetailsDialog(
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Column(
-                    Modifier.fillMaxWidth().padding(16.dp),
+                    Modifier.fillMaxWidth()
+                        .heightIn(
+                            max =
+                                (androidx.compose.ui.platform.LocalConfiguration.current
+                                        .screenHeightDp * 0.46f)
+                                    .dp
+                        )
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     content = actions,
                 )
@@ -172,14 +182,71 @@ internal fun DetailAction(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier,
+        modifier = modifier.heightIn(min = 48.dp),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, foreground.copy(alpha = 0.45f)),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = color),
     ) {
         Icon(icon, null, tint = foreground, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
-        Text(label, color = foreground)
+        Text(
+            label,
+            color = foreground,
+            modifier = Modifier.weight(1f, fill = false),
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+internal data class DetailActionSpec(
+    val label: String,
+    val icon: ImageVector,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit,
+)
+
+@Composable
+internal fun DetailActions(
+    secondary: List<DetailActionSpec> = emptyList(),
+    deleteAction: DetailActionSpec? = null,
+    primary: @Composable ColumnScope.() -> Unit = {},
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        primary()
+        if (secondary.isNotEmpty()) {
+            val fontScale = LocalDensity.current.fontScale
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val columns = if (maxWidth < 280.dp || fontScale > 1.3f) 1 else 2
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    secondary.chunked(columns).forEach { row ->
+                        Row(
+                            Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            row.forEach { action ->
+                                DetailAction(
+                                    action.label,
+                                    action.icon,
+                                    action.enabled,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    onClick = action.onClick,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        deleteAction?.let { action ->
+            DetailAction(
+                action.label,
+                action.icon,
+                action.enabled,
+                destructive = true,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = action.onClick,
+            )
+        }
     }
 }
 
@@ -234,26 +301,38 @@ internal fun TaskDefinitionDialog(
         onDismiss,
         busy,
         actions = {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!selection.historical) {
-                    DetailAction(
-                        if (selection.editable.active) "Bearbeiten" else "Fortsetzen",
-                        if (selection.editable.active) Icons.Default.Edit
-                        else Icons.Default.PlayArrow,
+            DetailActions(
+                secondary =
+                    buildList {
+                        if (!selection.historical) {
+                            add(
+                                DetailActionSpec(
+                                    if (selection.editable.active) "Bearbeiten" else "Fortsetzen",
+                                    if (selection.editable.active) Icons.Default.Edit
+                                    else Icons.Default.PlayArrow,
+                                    canManage,
+                                    onClick = onEdit,
+                                )
+                            )
+                            if (selection.editable.active)
+                                add(
+                                    DetailActionSpec(
+                                        "Pausieren",
+                                        Icons.Default.Pause,
+                                        canManage,
+                                        onClick = onPause,
+                                    )
+                                )
+                        }
+                    },
+                deleteAction =
+                    DetailActionSpec(
+                        "Löschen",
+                        Icons.Default.DeleteOutline,
                         canManage,
-                        onClick = onEdit,
-                    )
-                    if (selection.editable.active)
-                        DetailAction("Pausieren", Icons.Default.Pause, canManage, onClick = onPause)
-                }
-                DetailAction(
-                    "Löschen",
-                    Icons.Default.DeleteOutline,
-                    canManage,
-                    destructive = true,
-                    onClick = onDelete,
-                )
-            }
+                        onClick = onDelete,
+                    ),
+            )
         },
     ) {
         DetailSection("Auf einen Blick", AppTheme.colors.accentContainer) {

@@ -945,6 +945,7 @@ internal fun Checklist(
                 (childId == null || it.revision.childId == childId) &&
                 (!onlyMine || isResponsible(it.revision.responsibleParentId, state.uid))
         }
+    val dueTaskIds = due.map { it.revision.taskId }.toSet()
     val appointments =
         if (showAppointments) visibleAppointments(state, date, date, childId, onlyMine)
         else emptyList()
@@ -956,6 +957,7 @@ internal fun Checklist(
             date,
             upcomingTaskLimit,
             upcomingTaskDays,
+            dueTaskIds,
             childId,
             onlyMine,
             state.uid,
@@ -972,6 +974,7 @@ internal fun Checklist(
                     state.uid,
                     onlyMine,
                     days = upcomingTaskDays,
+                    excludedTaskIds = dueTaskIds,
                 )
             else emptyList()
         }
@@ -1629,51 +1632,67 @@ internal fun OccurrenceDialog(
             saveError?.let {
                 Text(it, color = StatusColors.error, style = MaterialTheme.typography.bodySmall)
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (occurrence.instant > Instant.now() && completed.isEmpty())
-                    DetailAction(
-                        "Bearbeiten",
-                        Icons.Default.Edit,
-                        visible && !state.fromCache && state.error == null,
-                        onClick = onEdit,
-                    )
-                DetailAction(
-                    "Löschen",
-                    Icons.Default.DeleteOutline,
-                    visible && !state.fromCache && state.error == null,
-                    destructive = true,
-                    onClick = onDelete,
-                )
-            }
-            if (completed.isEmpty())
-                Button(
-                    onClick = { completedById?.let(onComplete) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled =
-                        visible &&
-                            state.error == null &&
-                            state.parents.any { it.id == completedById },
-                ) {
-                    Icon(Icons.Default.Check, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Als erledigt bestätigen")
-                }
-            else
-                OutlinedButton(
-                    enabled = visible && state.error == null,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        if (confirmingUndo) {
-                            onUndo()
-                            confirmingUndo = false
-                        } else confirmingUndo = true
+            DetailActions(
+                secondary =
+                    buildList {
+                        if (
+                            (occurrence.instant > now ||
+                                isOneOffTaskSource(
+                                    state.revisions,
+                                    occurrence.revision.taskId,
+                                    occurrence.sourceRevisionId,
+                                )) && completed.isEmpty()
+                        )
+                            add(
+                                DetailActionSpec(
+                                    "Bearbeiten",
+                                    Icons.Default.Edit,
+                                    visible && !state.fromCache && state.error == null,
+                                    onClick = onEdit,
+                                )
+                            )
                     },
-                ) {
-                    Text(
-                        if (confirmingUndo) "Ja, Bestätigungen zurücknehmen"
-                        else "Bestätigung korrigieren"
-                    )
-                }
+                deleteAction =
+                    DetailActionSpec(
+                        "Löschen",
+                        Icons.Default.DeleteOutline,
+                        visible && !state.fromCache && state.error == null,
+                        onClick = onDelete,
+                    ),
+                primary = {
+                    if (completed.isEmpty())
+                        Button(
+                            onClick = { completedById?.let(onComplete) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            enabled =
+                                visible &&
+                                    state.error == null &&
+                                    state.parents.any { it.id == completedById },
+                        ) {
+                            Icon(Icons.Default.Check, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Als erledigt bestätigen")
+                        }
+                    else
+                        OutlinedButton(
+                            enabled = visible && state.error == null,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            onClick = {
+                                if (confirmingUndo) {
+                                    onUndo()
+                                    confirmingUndo = false
+                                } else confirmingUndo = true
+                            },
+                        ) {
+                            Text(
+                                if (confirmingUndo) "Ja, Bestätigungen zurücknehmen"
+                                else "Bestätigung korrigieren"
+                            )
+                        }
+                },
+            )
         },
     ) {
         DetailSection("Auf einen Blick", AppTheme.colors.accentContainer) {
@@ -2364,7 +2383,7 @@ private fun TaskEditor(
                     if (existing != null)
                         item {
                             Text(
-                                "Änderung gilt für: ${if (single) "nur diese Ausführung" else "diese und alle folgenden"}. Begonnene oder bestätigte Ausführungen bleiben erhalten."
+                                "Änderung gilt für: ${if (single) "nur diese Ausführung" else "diese und alle folgenden"}. Bestätigungen und begonnene Wiederholungen bleiben erhalten. Für einzelne Ausführungen darf das neue Datum auch in der Vergangenheit liegen."
                             )
                         }
                     item {
@@ -2499,7 +2518,8 @@ private fun TaskEditor(
                             { it?.let { chosen -> start = chosen } },
                             enabled = !busy,
                             minDate =
-                                if (existing == null) today
+                                if (single) null
+                                else if (existing == null) today
                                 else if (frequency == Frequency.ONCE) effective else null,
                         )
                     }
@@ -2562,7 +2582,8 @@ private fun TaskEditor(
                                         )
                                     revision.validate()
                                     require(
-                                        revision.frequency != Frequency.ONCE ||
+                                        single ||
+                                            revision.frequency != Frequency.ONCE ||
                                             revision.start >= effective
                                     ) {
                                         "Das Datum muss am oder nach dem Gültigkeitsbeginn liegen."
