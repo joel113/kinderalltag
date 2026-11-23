@@ -3,7 +3,6 @@ package de.kinderalltag.ui
 import android.content.Context
 import android.content.res.Configuration
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.appcompat.view.ContextThemeWrapper
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -15,7 +14,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
-import de.kinderalltag.R
 import de.kinderalltag.text.*
 import java.util.Locale
 
@@ -89,16 +87,6 @@ internal fun LanguagePicker(onChanging: () -> Unit = {}) {
 
 internal fun presentationLocale(configuration: Configuration): Locale =
     resolveAppLocale((0 until configuration.locales.size()).map { configuration.locales[it] })
-
-internal fun languageContext(context: Context): Context {
-    val localized = AppStrings.context(context)
-    val configuration = Configuration(localized.resources.configuration)
-    configuration.setLocale(presentationLocale(configuration))
-    return ContextThemeWrapper(
-        localized.createConfigurationContext(configuration),
-        R.style.Theme_Kinderalltag,
-    )
-}
 
 internal fun uses24HourClock(context: Context): Boolean {
     val configuration = Configuration(context.resources.configuration)

@@ -2,7 +2,7 @@
 
 ## App themes
 
-Local validation: all **257 Android JVM tests** pass, together with Spotless, Android Lint and debug assembly. The preview composables compile as part of the app build.
+Local validation: all **267 Android JVM tests** pass, together with Spotless, Android Lint and debug assembly. The preview composables compile as part of the app build.
 
 `AppThemeTest` checks stable saved IDs and Garden fallback, readable text/button contrast for all palettes, Garden palette compatibility, preserved child color choices and complete theme-specific illustration mappings. `ThemePreviews.kt` provides parameterized Garden/Play/Space/Animals/Vehicles/Nature/Farm/Magic previews for Home, display settings, task details, the monthly tracker and artwork/bear galleries. Home also has a 320dp/large-font preview. They use sample data and do not require Firebase.
 
@@ -312,3 +312,9 @@ Device acceptance (not established by JVM tests or compiled previews): test Andr
 Review Home, tasks, appointments, shopping/gifts, occurrence selection, history/statistics, trash, login/setup, legal headings, metadata badges, accessibility descriptions and all eight themes in both languages, including 320dp/large text. ThemePreviews includes English Home/settings/details/tracker previews. Verify native pickers, German and English speech, shopping review, Google sign-in and calendar sharing/import. Do not expect user-authored text, names, saved labels, contact details or external-app screens to translate.
 
 Schedule reminders, change language before delivery, and verify background/cold-start delivery and channel names, including legacy cached reminders and both-child/household subjects. Confirm channel IDs and notification preferences remain stable and completed tasks still suppress reminders; switching languages must not replay activity notices. New preset labels translate while existing/customized labels remain unchanged. No Firebase rules changes accompany this feature.
+
+## Native picker window ownership
+
+NativePickerHostTest uses Robolectric 4.16.1 with Android resources, simulating API 32 and 35. It opens date and time dialogs in German and English, asserts they retain the activity's WindowManager and owner, rejects application/configuration-only contexts, blocks finishing/destroyed activities, recreates the activity and opens a fresh picker, and checks graceful handling of an expired window token. Run with the documented JDK 17 or 21; Robolectric cannot instrument JDK 27 classes. The first run downloads test-only Android runtime artifacts; no emulator image or Firebase initialization is needed.
+
+Phone acceptance: edit an unfinished task, choose a different date, and save; repeat with a past date and with each daily time slot. Check appointment start/end dates, optional end-date clearing, history/date-search pickers, and time pickers in German/English/System with 12/24-hour settings. Rotate or change app language while a picker is open, dismiss by Back/outside tap, and reopen; there must be no crash or leaked window. Runtime tests do not replace this physical-device check.

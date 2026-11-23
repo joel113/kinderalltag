@@ -21,7 +21,7 @@ Do not translate saved task titles, notes, places, personal names, legal contact
 
 ## Dates, speech and notifications
 
-Date/month/weekday presentation follows the app locale; time fields retain the phone's 12/24-hour choice. Scheduling, Monday-first calendars, ISO values and Europe/Berlin remain unchanged. Speech uses the app language; shopping import understands German or English separators and always presents editable review text.
+Native pickers use an activity-backed theme wrapper with an override configuration, preserving the activity WindowManager/token while localizing resources. Application/configuration-only contexts are for resource lookup, never dialog windows. Date/month/weekday presentation follows the app locale; time fields retain the phone's 12/24-hour choice. Scheduling, Monday-first calendars, ISO values and Europe/Berlin remain unchanged. Speech uses the app language; shopping import understands German or English separators and always presents editable review text.
 
 Notifications resolve text in the current app language. New local reminder records retain raw titles and recipient identifiers. Legacy records are reconstructed from available cached data, with a localized generic title if unavailable. Channel IDs, delivery records and reminder fingerprints stay stable; language changes do not grant notification permission or replay events.
 

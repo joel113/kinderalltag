@@ -81,12 +81,17 @@ internal fun DatePickerField(
         val context = LocalContext.current
         val latestSelect by rememberUpdatedState(onSelect)
         DisposableEffect(context) {
+            val host = nativePickerHost(context)
+            if (host == null) {
+                open = false
+                return@DisposableEffect onDispose {}
+            }
             var initial = value ?: LocalDate.now(FAMILY_ZONE)
             minDate?.let { if (initial < it) initial = it }
             maxDate?.let { if (initial > it) initial = it }
             val dialog =
                 DatePickerDialog(
-                    languageContext(context),
+                    host.context,
                     { _, year, month, day ->
                         latestSelect(LocalDate.of(year, month + 1, day))
                         open = false
@@ -105,7 +110,7 @@ internal fun DatePickerField(
                     it.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
             }
             dialog.setOnDismissListener { open = false }
-            dialog.show()
+            if (!host.show(dialog)) open = false
             onDispose {
                 dialog.setOnDismissListener(null)
                 dialog.dismiss()
@@ -170,16 +175,21 @@ private fun NativeTimeDialog(
     val latestSelect by rememberUpdatedState(onSelect)
     val latestDismiss by rememberUpdatedState(onDismiss)
     DisposableEffect(context) {
+        val host = nativePickerHost(context)
+        if (host == null) {
+            latestDismiss()
+            return@DisposableEffect onDispose {}
+        }
         val dialog =
             TimePickerDialog(
-                context,
+                host.context,
                 { _, hour, minute -> latestSelect(LocalTime.of(hour, minute)) },
                 initial.hour,
                 initial.minute,
                 uses24HourClock(context),
             )
         dialog.setOnDismissListener { latestDismiss() }
-        dialog.show()
+        if (!host.show(dialog)) latestDismiss()
         onDispose {
             dialog.setOnDismissListener(null)
             dialog.dismiss()
