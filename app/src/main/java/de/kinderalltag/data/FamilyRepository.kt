@@ -18,6 +18,7 @@ data class FamilyState(
     val accessResolved: Boolean = false,
     val loaded: Boolean = false,
     val children: List<Child> = emptyList(),
+    val childRegistryReady: Boolean = false,
     val parents: List<Parent> = emptyList(),
     val appointments: List<AppointmentSeries> = emptyList(),
     val appointmentExceptions: List<AppointmentException> = emptyList(),
@@ -40,6 +41,7 @@ data class FamilyState(
 private val DATA_COLLECTIONS =
     setOf(
         "children",
+        "childRegistry",
         "revisions",
         "events",
         "members",
@@ -133,21 +135,32 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
                 } else if (listeners.isEmpty()) {
                     mutable.value =
                         mutable.value.copy(authorized = true, accessResolved = true, error = null)
+                    initializeChildren().addOnFailureListener { failure ->
+                        if (currentGeneration == generation) {
+                            Log.e(
+                                "KinderalltagSync",
+                                "Child registry initialization failed",
+                                failure,
+                            )
+                            mutable.value =
+                                mutable.value.copy(error = text(TextKey.CHILD_SETUP_FAILED))
+                        }
+                    }
+                    observeCollection("childRegistry") { snapshot ->
+                        mutable.value =
+                            mutable.value.copy(
+                                childRegistryReady =
+                                    snapshot.documents.any {
+                                        it.id == "state" && it.getLong("schemaVersion") == 2L
+                                    }
+                            )
+                    }
                     observeCollection("children") { snapshot ->
                         mutable.value =
                             mutable.value.copy(
                                 children =
                                     snapshot.documents
-                                        .map {
-                                            Child(
-                                                it.id,
-                                                requireNotNull(it.getString("name")),
-                                                BearColor.fromStored(
-                                                    it.getString("bearColor"),
-                                                    it.id,
-                                                ),
-                                            )
-                                        }
+                                        .map { decodeChild(it.id, requireNotNull(it.data)) }
                                         .sortedBy { it.name }
                             )
                     }
@@ -301,40 +314,106 @@ class FamilyRepository(private val auth: FirebaseAuth, private val db: FirebaseF
             }
     }
 
-    suspend fun saveRevision(revision: TaskRevision) {
-        revision.validate()
-        requireLocalized(mutable.value.revisions.none { it.taskId == revision.taskId }) {
-            message(TextKey.PLEASE_CHANGE_EXISTING_TASKS_THROUGH_EDIT_AND_SELECT_AN_OCCURRENCE)
-        }
-        requireLocalized(
-            revision.effective >= LocalDate.now(FAMILY_ZONE) &&
-                revision.start >= LocalDate.now(FAMILY_ZONE)
-        ) {
-            message(TextKey.NEW_TASKS_START_NO_EARLIER_THAN_TODAY)
+    suspend fun saveRevision(revision: TaskRevision) = saveRevisions(listOf(revision))
+
+    suspend fun saveRevisions(revisions: List<TaskRevision>) {
+        require(revisions.size in 1..10)
+        revisions.forEach { revision ->
+            revision.validate()
+            requireLocalized(mutable.value.revisions.none { it.taskId == revision.taskId }) {
+                message(TextKey.PLEASE_CHANGE_EXISTING_TASKS_THROUGH_EDIT_AND_SELECT_AN_OCCURRENCE)
+            }
+            requireLocalized(
+                revision.effective >= LocalDate.now(FAMILY_ZONE) &&
+                    revision.start >= LocalDate.now(FAMILY_ZONE)
+            ) {
+                message(TextKey.NEW_TASKS_START_NO_EARLIER_THAN_TODAY)
+            }
         }
         val uid = requireNotNull(auth.currentUser?.uid)
         // Transactions require a server connection. Definitions never enter the offline write
         // queue.
         db.runTransaction { tx ->
                 check(tx.get(household.collection("members").document(uid)).exists())
-                tx.set(
-                    household.collection("revisions").document(revision.id),
-                    revision.encode(uid),
-                )
+                revisions.forEach { revision ->
+                    val child = mutable.value.children.firstOrNull { it.id == revision.childId }
+                    require(revision.childId == "haushalt" || child != null && !child.archived)
+                    tx.set(
+                        household.collection("revisions").document(revision.id),
+                        revision.encode(uid),
+                    )
+                }
             }
             .await()
     }
 
+    /** Additive, idempotent migration. Child documents and immutable history are untouched. */
+    private fun initializeChildren() =
+        db.runTransaction { tx ->
+            val ref = household.collection("childRegistry").document("state")
+            val registry = tx.get(ref)
+            if (!registry.exists()) {
+                val legacy =
+                    listOf("ferdinand", "johann").filter {
+                        tx.get(household.collection("children").document(it)).exists()
+                    }
+                tx.set(
+                    ref,
+                    mapOf(
+                        "schemaVersion" to 2,
+                        "version" to 0,
+                        "knownIds" to legacy,
+                        "activeIds" to legacy,
+                        "changedId" to "",
+                    ),
+                )
+            }
+        }
+
     suspend fun saveChild(child: Child) {
-        require(child.name.isNotBlank() && child.name.length <= 60)
+        requireLocalized(child.name.isNotBlank() && child.name.trim().length <= 60) {
+            message(TextKey.CHILD_NAME_REQUIRED)
+        }
+        require(child.id != "haushalt" && child.id.matches(Regex("[A-Za-z0-9_-]{1,100}")))
+        val registryRef = household.collection("childRegistry").document("state")
+        val childRef = household.collection("children").document(child.id)
         db.runTransaction { tx ->
                 check(
                     tx.get(household.collection("members").document(requireNotNull(auth.uid)))
                         .exists()
                 )
+                val registry = tx.get(registryRef)
+                check(registry.exists()) { text(TextKey.CHILD_SETUP_FAILED) }
+                val old = tx.get(childRef)
+                requireLocalized((old.getLong("version") ?: 0) == child.version) {
+                    message(TextKey.CHILD_CHANGED_RELOAD)
+                }
+                val active =
+                    (registry.get("activeIds") as List<*>).filterIsInstance<String>().toMutableSet()
+                val known =
+                    (registry.get("knownIds") as List<*>).filterIsInstance<String>().toMutableSet()
+                if (child.archived) active.remove(child.id) else active.add(child.id)
+                requireLocalized(active.size <= 10) { message(TextKey.TEN_ACTIVE_CHILDREN) }
+                known.add(child.id)
                 tx.set(
-                    household.collection("children").document(child.id),
-                    mapOf("name" to child.name.trim(), "bearColor" to child.bearColor.name),
+                    registryRef,
+                    mapOf(
+                        "schemaVersion" to 2,
+                        "version" to requireNotNull(registry.getLong("version")) + 1,
+                        "knownIds" to known.sorted(),
+                        "activeIds" to active.sorted(),
+                        "changedId" to child.id,
+                    ),
+                )
+                tx.set(
+                    childRef,
+                    mapOf(
+                        "name" to child.name.trim(),
+                        "bearColor" to child.bearColor.name,
+                        "icon" to child.icon.name,
+                        "archived" to child.archived,
+                        "version" to if (old.exists()) child.version + 1 else 0,
+                    ),
                 )
             }
             .await()

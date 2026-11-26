@@ -10,7 +10,7 @@ import java.time.LocalTime
 internal fun AppointmentDetails.encodeDetails(): Map<String, Any?> =
     mapOf(
         "title" to title.trim(),
-        "recipient" to recipient.name,
+        "recipient" to recipient.stored(),
         "date" to date.toString(),
         "startTime" to startTime.toString(),
         "endTime" to endTime.toString(),
@@ -38,7 +38,7 @@ internal fun AppointmentSeries.encodeAppointment(uid: String): Map<String, Any?>
 internal fun decodeDetails(data: Map<*, *>) =
     AppointmentDetails(
             title = data["title"] as String,
-            recipient = AppointmentRecipient.valueOf(data["recipient"] as String),
+            recipient = AppointmentRecipient.fromStored(data["recipient"]),
             date = LocalDate.parse(data["date"] as String),
             startTime = LocalTime.parse(data["startTime"] as String),
             endTime = LocalTime.parse(data["endTime"] as String),

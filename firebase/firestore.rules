@@ -13,9 +13,30 @@ service cloud.firestore {
     function responsible(value) {
       return value == null || (value is string && exists(/databases/$(database)/documents/households/family/members/$(value)));
     }
+    function childRegistryExists() {
+      return exists(/databases/$(database)/documents/households/family/childRegistry/state);
+    }
+    function childRegistry() {
+      return get(/databases/$(database)/documents/households/family/childRegistry/state).data;
+    }
+    function validChildId(id) {
+      return id in ['ferdinand', 'johann', 'haushalt'] || (id is string && childRegistryExists() && id in childRegistry().knownIds);
+    }
+    function validRecipient(r, household) {
+      return (r is string && r in (household ? ['FERDINAND', 'JOHANN', 'BOTH_CHILDREN', 'HOUSEHOLD'] : ['FERDINAND', 'JOHANN', 'BOTH_CHILDREN']))
+        || (exactFields(r, ['kind', 'childIds']) && r.kind == 'CHILDREN'
+          && r.childIds is list && r.childIds.size() >= 1 && r.childIds.size() <= 10
+          && r.childIds.toSet().size() == r.childIds.size()
+          && r.childIds.join(',').split(',') == r.childIds
+          && r.childIds.join(',').matches('^[A-Za-z0-9_-]{1,100}(,[A-Za-z0-9_-]{1,100})*$')
+          && childRegistryExists() && r.childIds.hasOnly(childRegistry().knownIds));
+    }
+    function validColor(c) {
+      return c in ['BLUE', 'ROSE', 'GREEN', 'HONEY', 'BROWN', 'PURPLE', 'TEAL', 'ORANGE', 'CORAL', 'INDIGO'];
+    }
     function validDetails(d) {
       return exactFields(d, ['title', 'recipient', 'date', 'startTime', 'endTime', 'allDay', 'responsibleParentId', 'location', 'notes', 'reminderMinutes'])
-        && text(d.title, 120) && d.recipient in ['FERDINAND', 'JOHANN', 'BOTH_CHILDREN', 'HOUSEHOLD']
+        && text(d.title, 120) && validRecipient(d.recipient, true)
         && date(d.date) && validTime(d.startTime) && validTime(d.endTime) && d.allDay is bool
         && (d.allDay || d.endTime > d.startTime) && responsible(d.responsibleParentId)
         && d.location is string && d.location.size() <= 300 && d.notes is string && d.notes.size() <= 2000
@@ -38,7 +59,7 @@ service cloud.firestore {
     function validTaskSnapshot(t) {
       let fields = ['id', 'taskId', 'childId', 'title', 'notes', 'frequency', 'weekdays', 'times', 'start', 'end', 'effective', 'active', 'createdMillis', 'authorId', 'responsibleParentId', 'slotOrigins'];
       return t is map && t.keys().hasAll(fields) && t.keys().hasOnly(fields.concat(['interval']))
-        && text(t.id, 100) && text(t.taskId, 100) && t.childId in ['ferdinand', 'johann', 'haushalt']
+        && text(t.id, 100) && text(t.taskId, 100) && validChildId(t.childId)
         && text(t.title, 120) && t.notes is string && t.notes.size() <= 2000
         && t.frequency in ['ONCE', 'DAILY', 'WEEKDAYS', 'WEEKS', 'MONTHS'] && validTaskInterval(t)
         && t.weekdays is list && t.weekdays.size() <= 7
@@ -52,16 +73,12 @@ service cloud.firestore {
         && (t.frequency in ['DAILY', 'WEEKS', 'MONTHS'] || interval == 1);
     }
     function validOrigins(origins, count) {
+      // One joined validation leaves room for dynamic child lookups and delegated edits.
+      // Prefix bounds preserve the 120-character limit for every origin/second width.
+      let origin = '([^|,]{1,118}[|][0-9]|[^|,]{1,117}[|][0-9]{2}|[^|,]{1,116}[|][0-9]{3}|[^|,]{1,115}[|][0-9]{4}|[^|,]{1,114}[|]([0-7][0-9]{4}|8[0-5][0-9]{3}|86[0-3][0-9]{2}))';
       return origins is list && (origins.size() == 0 || (origins.size() == count
-        && originAt(origins, 0) && originAt(origins, 1) && originAt(origins, 2) && originAt(origins, 3)
-        && originAt(origins, 4) && originAt(origins, 5) && originAt(origins, 6) && originAt(origins, 7)));
-    }
-    function originAt(origins, index) {
-      return origins.size() <= index || validOrigin(origins[index]);
-    }
-    function validOrigin(value) {
-      return value is string && value.size() <= 120
-        && value.matches('^[^|]+[|]([0-7]?[0-9]{1,4}|8[0-5][0-9]{3}|86[0-3][0-9]{2})$');
+        && origins.join(',').split(',') == origins
+        && origins.join(',').matches('^' + origin + '(,' + origin + '){0,7}$')));
     }
     function validOccurrenceSnapshot(s, event) {
       return exactFields(s, ['revision', 'date', 'time', 'id', 'originalDate', 'originalTime', 'sourceId'])
@@ -78,7 +95,7 @@ service cloud.firestore {
     function validListLabel(d) {
       return exactFields(d, ['id', 'group', 'name', 'color', 'active', 'version'])
         && text(d.id, 100) && d.group in ['SHOPPING', 'OCCASION', 'GIVER'] && text(d.name, 60)
-        && d.color in ['BLUE', 'ROSE', 'GREEN', 'HONEY', 'BROWN', 'PURPLE'] && d.active is bool
+        && validColor(d.color) && d.active is bool
         && d.version is int && d.version >= 0;
     }
     function listLabelAt(d, index) {
@@ -89,7 +106,7 @@ service cloud.firestore {
     function validListItem(d) {
       return exactFields(d, ['id', 'kind', 'title', 'notes', 'recipient', 'labelIds', 'version', 'deleted', 'lastActivityId'])
         && text(d.id, 100) && text(d.title, 120) && d.notes is string && d.notes.size() <= 2000
-        && ((d.kind == 'SHOPPING' && d.recipient == null) || (d.kind == 'GIFTS' && d.recipient in ['FERDINAND', 'JOHANN', 'BOTH_CHILDREN']))
+        && ((d.kind == 'SHOPPING' && d.recipient == null) || (d.kind == 'GIFTS' && validRecipient(d.recipient, false)))
         && d.version is int && d.version >= 0 && d.deleted is bool && text(d.lastActivityId, 100)
         && d.labelIds is list && d.labelIds.size() <= 6 && d.labelIds.toSet().size() == d.labelIds.size()
         && listLabelAt(d, 0) && listLabelAt(d, 1) && listLabelAt(d, 2) && listLabelAt(d, 3) && listLabelAt(d, 4) && listLabelAt(d, 5);
@@ -100,7 +117,7 @@ service cloud.firestore {
       // historical names/colors so archived or renamed labels keep their audit snapshots.
       return label == current || (label is map
         && label.diff(current).affectedKeys().hasOnly(['name', 'color', 'active', 'version'])
-        && text(label.name, 60) && label.color in ['BLUE', 'ROSE', 'GREEN', 'HONEY', 'BROWN', 'PURPLE']
+        && text(label.name, 60) && validColor(label.color)
         && label.active is bool && label.version is int && label.version >= 0);
     }
     function activityLabelAt(d, index) {
@@ -186,13 +203,61 @@ service cloud.firestore {
       allow list: if member();
       allow write: if false;
     }
-    match /households/family/children/{childId} {
+    match /households/family/childRegistry/{registryId} {
+      function validRegistry() {
+        let d = request.resource.data;
+        return registryId == 'state' && exactFields(d, ['schemaVersion', 'version', 'knownIds', 'activeIds', 'changedId'])
+          && d.schemaVersion == 2 && d.version is int && d.version >= 0
+          && d.knownIds is list && d.knownIds.toSet().size() == d.knownIds.size()
+          && d.activeIds is list && d.activeIds.size() <= 10 && d.activeIds.toSet().size() == d.activeIds.size()
+          && d.activeIds.hasOnly(d.knownIds);
+      }
+      function initialRegistry() {
+        let d = request.resource.data;
+        return d.version == 0 && d.changedId == '' && d.knownIds.hasOnly(['ferdinand', 'johann'])
+          && ('ferdinand' in d.knownIds) == exists(/databases/$(database)/documents/households/family/children/ferdinand)
+          && ('johann' in d.knownIds) == exists(/databases/$(database)/documents/households/family/children/johann)
+          && d.activeIds.toSet() == d.knownIds.toSet();
+      }
+      function registryChange() {
+        let d = request.resource.data;
+        let child = getAfter(/databases/$(database)/documents/households/family/children/$(d.changedId)).data;
+        let expectedVersion = exists(/databases/$(database)/documents/households/family/children/$(d.changedId))
+          ? get(/databases/$(database)/documents/households/family/children/$(d.changedId)).data.get('version', 0) + 1 : 0;
+        return text(d.changedId, 100) && d.changedId != 'haushalt'
+          && d.changedId.matches('^[A-Za-z0-9_-]{1,100}$')
+          && d.version == resource.data.version + 1
+          && d.knownIds.toSet() == resource.data.knownIds.toSet().union([d.changedId].toSet())
+          && child.version == expectedVersion
+          && d.activeIds.toSet() == (child.archived
+            ? resource.data.activeIds.toSet().difference([d.changedId].toSet())
+            : resource.data.activeIds.toSet().union([d.changedId].toSet()));
+      }
       allow read: if member();
-      allow update: if member() && request.resource.data.keys().hasOnly(['name', 'bearColor'])
-        && text(request.resource.data.name, 60)
-        && (!('bearColor' in request.resource.data)
-          || request.resource.data.bearColor in ['BLUE', 'ROSE', 'GREEN', 'HONEY', 'BROWN', 'PURPLE']);
-      allow create, delete: if false;
+      allow create: if member() && validRegistry() && initialRegistry();
+      allow update: if member() && validRegistry() && registryChange();
+      allow delete: if false;
+    }
+    match /households/family/children/{childId} {
+      function validChild() {
+        let d = request.resource.data;
+        let registry = getAfter(/databases/$(database)/documents/households/family/childRegistry/state).data;
+        return childId != 'haushalt' && childId.matches('^[A-Za-z0-9_-]{1,100}$')
+          && exactFields(d, ['name', 'bearColor', 'icon', 'archived', 'version'])
+          && text(d.name, 60) && validColor(d.bearColor)
+          && d.icon in ['BEAR', 'FOX', 'RABBIT', 'LION', 'ELEPHANT', 'WHALE', 'PENGUIN', 'DINOSAUR', 'TRACTOR', 'UNICORN']
+          && d.archived is bool && d.version is int
+          && registry.changedId == childId && childId in registry.knownIds
+          && registry.version == childRegistry().version + 1
+          && (childId in registry.activeIds) == !d.archived;
+      }
+      allow read: if member();
+      allow create: if member() && validChild() && request.resource.data.version == 0;
+      allow update: if member() && ((validChild() && request.resource.data.version == resource.data.get('version', 0) + 1)
+        || (!childRegistryExists() && request.resource.data.keys().hasOnly(['name', 'bearColor'])
+          && text(request.resource.data.name, 60)
+          && (!('bearColor' in request.resource.data) || validColor(request.resource.data.bearColor))));
+      allow delete: if false;
     }
     match /households/family/revisions/{revisionId} {
       allow read: if member();
@@ -202,7 +267,7 @@ service cloud.firestore {
           'taskId', 'childId', 'title', 'notes', 'frequency', 'weekdays', 'times', 'start', 'end', 'effective', 'active', 'authorId', 'createdAt', 'responsibleParentId', 'interval'])
         && text(request.resource.data.taskId, 100)
         && (!('responsibleParentId' in request.resource.data) || responsible(request.resource.data.responsibleParentId))
-        && request.resource.data.childId in ['ferdinand', 'johann', 'haushalt']
+        && validChildId(request.resource.data.childId)
         && text(request.resource.data.title, 120)
         && request.resource.data.notes is string && request.resource.data.notes.size() <= 2000
         && request.resource.data.frequency in ['ONCE', 'DAILY', 'WEEKDAYS', 'WEEKS', 'MONTHS']
@@ -356,9 +421,9 @@ service cloud.firestore {
           && d.authorId == request.auth.uid && text(d.authorName, 120) && d.createdAt == request.time
           && d.version is int && control.version == d.version && control.operationId == operationId
           && control.updatedAt == request.time && control.authorId == request.auth.uid
-          && ((d.type == 'TASK' && d.childId in ['ferdinand', 'johann', 'haushalt'] && d.recipient == null
+          && ((d.type == 'TASK' && validChildId(d.childId) && d.recipient == null
               && get(/databases/$(database)/documents/households/family/revisions/$(d.sourceId)).data.taskId == d.itemId)
-            || (d.type == 'APPOINTMENT' && d.childId == null && d.recipient in ['FERDINAND', 'JOHANN', 'BOTH_CHILDREN', 'HOUSEHOLD']
+            || (d.type == 'APPOINTMENT' && d.childId == null && validRecipient(d.recipient, true)
               && exists(/databases/$(database)/documents/households/family/appointmentSeries/$(d.sourceId))))
           && ((d.action == 'EDIT' && d.scope in ['SINGLE', 'FOLLOWING'] && d.restoresId == null
               && (d.actualStartAt > request.time

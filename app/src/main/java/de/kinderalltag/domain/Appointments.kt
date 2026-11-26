@@ -4,20 +4,76 @@ import de.kinderalltag.text.*
 import java.time.*
 import java.time.temporal.ChronoUnit
 
-enum class AppointmentRecipient {
-    FERDINAND,
-    JOHANN,
-    BOTH_CHILDREN,
-    HOUSEHOLD;
-
+/** Explicit recipients. Legacy names remain readable without changing historical snapshots. */
+@ConsistentCopyVisibility
+data class AppointmentRecipient
+private constructor(val childIds: Set<String>, val household: Boolean = false) :
+    java.io.Serializable {
     fun matches(sectionId: String?): Boolean =
-        sectionId == null ||
+        sectionId == null || if (household) sectionId == "haushalt" else sectionId in childIds
+
+    fun visibleFor(children: List<Child>): Boolean =
+        household || children.any { !it.archived && it.id in childIds }
+
+    fun toggleChild(id: String): AppointmentRecipient {
+        val ids = if (id in childIds) childIds - id else childIds + id
+        return if (ids.size in 1..10) children(ids) else this
+    }
+
+    val name: String
+        get() =
             when (this) {
-                FERDINAND -> sectionId == "ferdinand"
-                JOHANN -> sectionId == "johann"
-                BOTH_CHILDREN -> sectionId == "ferdinand" || sectionId == "johann"
-                HOUSEHOLD -> sectionId == "haushalt"
+                FERDINAND -> "FERDINAND"
+                JOHANN -> "JOHANN"
+                BOTH_CHILDREN -> "BOTH_CHILDREN"
+                HOUSEHOLD -> "HOUSEHOLD"
+                else -> "CHILDREN:" + childIds.sorted().joinToString(",")
             }
+
+    // Keep legacy wire values for unchanged selections: immutable audit equality depends on it.
+    fun stored(): Any =
+        if (name.startsWith("CHILDREN:"))
+            mapOf("kind" to "CHILDREN", "childIds" to childIds.sorted())
+        else name
+
+    companion object {
+        val FERDINAND = AppointmentRecipient(setOf("ferdinand"))
+        val JOHANN = AppointmentRecipient(setOf("johann"))
+        val BOTH_CHILDREN = AppointmentRecipient(setOf("ferdinand", "johann"))
+        val HOUSEHOLD = AppointmentRecipient(emptySet(), true)
+
+        fun children(ids: Set<String>): AppointmentRecipient {
+            require(
+                ids.size in 1..10 &&
+                    ids.all { it.matches(Regex("[A-Za-z0-9_-]{1,100}")) && it != "haushalt" }
+            )
+            return AppointmentRecipient(ids.toSortedSet())
+        }
+
+        fun valueOf(value: String): AppointmentRecipient =
+            when (value) {
+                "FERDINAND" -> FERDINAND
+                "JOHANN" -> JOHANN
+                "BOTH_CHILDREN" -> BOTH_CHILDREN
+                "HOUSEHOLD" -> HOUSEHOLD
+                else -> {
+                    require(value.startsWith("CHILDREN:"))
+                    children(value.removePrefix("CHILDREN:").split(",").toSet())
+                }
+            }
+
+        fun fromStored(value: Any?): AppointmentRecipient =
+            when (value) {
+                is String -> valueOf(value)
+                is Map<*, *> -> {
+                    require(value.keys == setOf("kind", "childIds") && value["kind"] == "CHILDREN")
+                    val ids = value["childIds"] as List<*>
+                    require(ids.all { it is String } && ids.toSet().size == ids.size)
+                    children(ids.filterIsInstance<String>().toSet())
+                }
+                else -> error("Invalid recipient")
+            }
+    }
 }
 
 enum class AppointmentRepeat {

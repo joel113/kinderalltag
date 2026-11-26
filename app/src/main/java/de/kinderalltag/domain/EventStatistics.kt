@@ -91,27 +91,35 @@ fun eventStatistics(
             else entry.authorName,
         )
     }
-    val subjectNames =
-        linkedMapOf(
-            "ferdinand" to (children.firstOrNull { it.id == "ferdinand" }?.name ?: "Ferdinand"),
-            "johann" to (children.firstOrNull { it.id == "johann" }?.name ?: "Johann"),
-            "both" to text(TextKey.BOTH_CHILDREN),
-            "haushalt" to text(TextKey.HOUSEHOLD),
-            "shopping" to text(TextKey.SHOPPING),
-        )
-    fun subjectId(entry: HistoryEntry): String =
+    val subjectNames = linkedMapOf<String, String>()
+    children.forEach {
+        subjectNames[it.id] =
+            it.name + if (it.archived) " (" + text(TextKey.CHILD_ARCHIVED) + ")" else ""
+    }
+    subjectNames["haushalt"] = text(TextKey.HOUSEHOLD)
+    subjectNames["shopping"] = text(TextKey.SHOPPING)
+    fun subjectIds(entry: HistoryEntry): Set<String> =
         when {
-            entry.listKind == FamilyListKind.SHOPPING -> "shopping"
-            entry.childId in listOf("ferdinand", "johann", "haushalt") ->
-                requireNotNull(entry.childId)
-            entry.recipient == AppointmentRecipient.FERDINAND -> "ferdinand"
-            entry.recipient == AppointmentRecipient.JOHANN -> "johann"
-            entry.recipient == AppointmentRecipient.BOTH_CHILDREN -> "both"
-            entry.recipient == AppointmentRecipient.HOUSEHOLD -> "haushalt"
-            else -> "unknown"
+            entry.listKind == FamilyListKind.SHOPPING -> setOf("shopping")
+            entry.childId != null -> setOf(entry.childId)
+            entry.recipient?.household == true -> setOf("haushalt")
+            entry.recipient != null -> entry.recipient.childIds
+            else -> setOf("unknown")
         }
-    val bySubject = uniqueEntries.groupBy(::subjectId)
-    if ("unknown" in bySubject) subjectNames["unknown"] = text(TextKey.UNKNOWN)
+    uniqueEntries
+        .flatMap { subjectIds(it) }
+        .forEach { id ->
+            subjectNames.putIfAbsent(
+                id,
+                when (id) {
+                    "johann" -> "Johann"
+                    "ferdinand" -> "Ferdinand"
+                    else -> text(TextKey.UNKNOWN)
+                },
+            )
+        }
+    val bySubject =
+        subjectNames.keys.associateWith { id -> uniqueEntries.filter { id in subjectIds(it) } }
     val byParent = uniqueEntries.groupBy(::parentId)
     val byWeekday =
         uniqueEntries.groupBy { Instant.ofEpochMilli(it.millis).atZone(FAMILY_ZONE).dayOfWeek }

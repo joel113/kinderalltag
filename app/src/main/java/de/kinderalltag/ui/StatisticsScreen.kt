@@ -63,6 +63,9 @@ internal fun StatisticsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
+            Text(text(TextKey.CHILD_STATISTICS_HELP), style = MaterialTheme.typography.bodySmall)
+        }
+        item {
             AppBanner(
                 text(TextKey.YOUR_FAMILY_DAY_IN_NUMBERS),
                 text(TextKey.LITTLE_STEPS_THAT_CARRY_YOUR_FAMILY_DAY),

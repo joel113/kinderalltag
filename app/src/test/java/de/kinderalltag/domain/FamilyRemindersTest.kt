@@ -39,7 +39,7 @@ class FamilyRemindersTest {
     ) =
         FamilyReminders.plan(
             "a",
-            emptyList(),
+            listOf(Child("johann", "Johann"), Child("ferdinand", "Ferdinand")),
             tasks,
             emptyList(),
             appointments,
@@ -81,7 +81,7 @@ class FamilyRemindersTest {
         val limited =
             FamilyReminders.plan(
                 "a",
-                emptyList(),
+                listOf(Child("johann", "Johann"), Child("ferdinand", "Ferdinand")),
                 listOf(task()),
                 emptyList(),
                 listOf(appointment()),

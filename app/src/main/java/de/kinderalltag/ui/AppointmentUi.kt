@@ -32,6 +32,7 @@ internal data class AppointmentEditTarget(
     val imported: CalendarImport? = null,
     val importKey: String? = null,
     val operationVersion: Long = 0,
+    val initialDate: LocalDate? = null,
 )
 
 internal class AppointmentUiState {
@@ -55,6 +56,7 @@ internal fun visibleAppointments(
 ) =
     state.appointmentOccurrences(from, to).filter {
         it.details.recipient.matches(section) &&
+            (section != null || it.details.recipient.visibleFor(state.children)) &&
             (!onlyMine || isResponsible(it.details.responsibleParentId, state.uid))
     }
 
@@ -145,6 +147,7 @@ internal fun AppointmentAgenda(
                 onlyMine,
                 state.appointmentActivity,
                 state.itemOperations,
+                children = state.children,
             )
         else emptyMap()
     val appointments =
@@ -441,14 +444,31 @@ private fun AppointmentEditor(
     val id = remember { UUID.randomUUID().toString() }
     var title by rememberSaveable { mutableStateOf(seed?.title.orEmpty()) }
     var recipient by rememberSaveable {
-        mutableStateOf(seed?.recipient ?: AppointmentRecipient.FERDINAND)
+        mutableStateOf(
+            seed?.recipient
+                ?: state.children
+                    .firstOrNull { !it.archived }
+                    ?.let { AppointmentRecipient.children(setOf(it.id)) }
+                ?: AppointmentRecipient.HOUSEHOLD
+        )
     }
     var parent by rememberSaveable { mutableStateOf(seed?.responsibleParentId) }
     var date by rememberSaveable {
-        mutableStateOf(seed?.date ?: LocalDate.now(FAMILY_ZONE).plusDays(1))
+        mutableStateOf(seed?.date ?: target.initialDate ?: LocalDate.now(FAMILY_ZONE).plusDays(1))
     }
-    var start by rememberSaveable { mutableStateOf(seed?.startTime ?: LocalTime.of(9, 0)) }
-    var end by rememberSaveable { mutableStateOf(seed?.endTime ?: LocalTime.of(10, 0)) }
+    val context = LocalContext.current
+    val defaultDuration = remember { AppointmentDefaults.duration(context) }
+    var timing by rememberSaveable {
+        val initialStart = seed?.startTime ?: LocalTime.of(9, 0)
+        mutableStateOf(
+            AppointmentTimeDraft(
+                initialStart,
+                seed?.endTime ?: defaultAppointmentEnd(initialStart, defaultDuration),
+            )
+        )
+    }
+    val start = timing.start
+    val end = timing.end
     var allDay by rememberSaveable { mutableStateOf(seed?.allDay ?: false) }
     var location by rememberSaveable { mutableStateOf(seed?.location.orEmpty()) }
     var notes by rememberSaveable { mutableStateOf(seed?.notes.orEmpty()) }
@@ -561,19 +581,8 @@ private fun AppointmentEditor(
                     }
                     item { Text(text(TextKey.WHICH_AREA), fontWeight = FontWeight.Bold) }
                     item {
-                        Row(
-                            Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            AppointmentRecipient.entries.forEach { value ->
-                                FilterChip(
-                                    value == recipient,
-                                    { recipient = value },
-                                    label = {
-                                        Text(appointmentRecipientName(value, state.sections))
-                                    },
-                                )
-                            }
+                        ChildRecipientPicker(state.children, recipient, enabled = !busy) {
+                            recipient = it
                         }
                     }
                     item { AssignmentPicker(state.parents, parent) { parent = it } }
@@ -605,7 +614,7 @@ private fun AppointmentEditor(
                             TimePickerField(
                                 text(TextKey.START),
                                 start,
-                                { start = it },
+                                { timing = timing.selectStart(it, defaultDuration) },
                                 enabled = !busy,
                             )
                         }
@@ -613,9 +622,14 @@ private fun AppointmentEditor(
                             TimePickerField(
                                 text(TextKey.END_SAME_DAY),
                                 end,
-                                { end = it },
+                                { timing = timing.selectEnd(it) },
                                 enabled = !busy,
                             )
+                            if (timing.durationClipped(defaultDuration))
+                                Text(
+                                    text(TextKey.APPOINTMENT_DURATION_CLIPPED),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                         }
                     }
                     item {

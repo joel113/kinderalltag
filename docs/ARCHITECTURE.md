@@ -7,7 +7,8 @@ The UI observes a `FamilyViewModel`, backed by `FamilyRepository` and Firestore 
 All data belongs to `households/family`:
 
 - `members/{authUid}`: manually provisioned membership; authorized household members can read the parent roster; an unprovisioned user can read only their own membership. Clients cannot grant or change membership.
-- `children/{ferdinand|johann}`: editable `name` and optional `bearColor` palette key; console-provisioned IDs remain stable. Missing or unknown color values use each child's default. The bear is drawn in Compose from the `bear.jpg` reference, with only the fur color changing; household tasks keep their house icon.
+- `children/{stableId}`: shared name, ten-colour `bearColor` key, `icon`, `archived` and optimistic `version`. Existing `johann`/`ferdinand` IDs and appearance remain stable. Archive preserves historical references; profiles cannot be deleted.
+- `childRegistry/state`: schema version 2, monotonically increasing version, known IDs, active IDs (at most ten), and the changed profile ID. Profile lifecycle/appearance writes and registry updates are atomic, validated in both directions by rules. See [migration and rollout](DYNAMIC_CHILDREN.md).
 - `Haushalt` is a fixed section appended to the child profiles in the app, with reserved task `childId` value `haushalt`. It has no profile document and is not editable as a child. Existing task documents keep their current format.
 - `revisions/{uuid}`: immutable full task definitions, including task ID, child ID, title, notes, recurrence, times, start/end, effective date, author, and server creation time. Optional `responsibleParentId` selects one parent; missing/null means both parents.
 - `events/{uuid}`: immutable completion or retraction, occurrence ID, actual date, actor, device action time, server receipt time, and optional target completion ID. New confirmations include a full task occurrence snapshot.

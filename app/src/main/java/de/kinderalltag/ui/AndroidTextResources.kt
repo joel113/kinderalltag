@@ -6,6 +6,44 @@ import de.kinderalltag.text.*
 internal val TextKey.resourceId: Int
     get() =
         when (this) {
+            TextKey.DEFAULT_APPOINTMENT_DURATION -> R.string.msg_default_appointment_duration
+            TextKey.APPOINTMENT_DURATION_RANGE -> R.string.msg_appointment_duration_range
+            TextKey.APPOINTMENT_DURATION_MINUTES -> R.string.msg_appointment_duration_minutes
+            TextKey.APPOINTMENT_DURATION_HELP -> R.string.msg_appointment_duration_help
+            TextKey.APPOINTMENT_DURATION_CLIPPED -> R.string.msg_appointment_duration_clipped
+
+            TextKey.CHILD_SETUP_FAILED -> R.string.msg_child_setup_failed
+            TextKey.CHILD_NAME_REQUIRED -> R.string.msg_child_name_required
+            TextKey.CHILD_CHANGED_RELOAD -> R.string.msg_child_changed_reload
+            TextKey.TEN_ACTIVE_CHILDREN -> R.string.msg_ten_active_children
+            TextKey.CHILDREN_HELP -> R.string.msg_children_help
+            TextKey.CHILD_ARCHIVED -> R.string.msg_child_archived
+            TextKey.CHILD_ARCHIVE -> R.string.msg_child_archive
+            TextKey.CHILD_RESTORE -> R.string.msg_child_restore
+            TextKey.CHILD_ARCHIVE_HELP -> R.string.msg_child_archive_help
+            TextKey.CHILD_RESTORE_HELP -> R.string.msg_child_restore_help
+            TextKey.ADD_CHILD -> R.string.msg_add_child
+            TextKey.ADD_CHILD_FIRST -> R.string.msg_add_child_first
+            TextKey.CHILD_ICON -> R.string.msg_child_icon
+            TextKey.CHILD_COLOR -> R.string.msg_child_color
+            TextKey.ALL_CHILDREN -> R.string.msg_all_children
+            TextKey.CONFIRM -> R.string.msg_confirm
+            TextKey.CHILD_STATISTICS_HELP -> R.string.msg_child_statistics_help
+            TextKey.CHILD_ICON_BEAR -> R.string.msg_child_icon_bear
+            TextKey.CHILD_ICON_FOX -> R.string.msg_child_icon_fox
+            TextKey.CHILD_ICON_RABBIT -> R.string.msg_child_icon_rabbit
+            TextKey.CHILD_ICON_LION -> R.string.msg_child_icon_lion
+            TextKey.CHILD_ICON_ELEPHANT -> R.string.msg_child_icon_elephant
+            TextKey.CHILD_ICON_WHALE -> R.string.msg_child_icon_whale
+            TextKey.CHILD_ICON_PENGUIN -> R.string.msg_child_icon_penguin
+            TextKey.CHILD_ICON_DINOSAUR -> R.string.msg_child_icon_dinosaur
+            TextKey.CHILD_ICON_TRACTOR -> R.string.msg_child_icon_tractor
+            TextKey.CHILD_ICON_UNICORN -> R.string.msg_child_icon_unicorn
+            TextKey.CHILD_COLOR_TEAL -> R.string.msg_child_color_teal
+            TextKey.CHILD_COLOR_ORANGE -> R.string.msg_child_color_orange
+            TextKey.CHILD_COLOR_CORAL -> R.string.msg_child_color_coral
+            TextKey.CHILD_COLOR_INDIGO -> R.string.msg_child_color_indigo
+
             TextKey.DELETED -> R.string.msg_deleted
             TextKey.CHANGED -> R.string.msg_changed
             TextKey.RECORDED_BY -> R.string.msg_recorded_by

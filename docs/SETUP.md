@@ -41,15 +41,17 @@ The first version has one household with two equal parents. Provisioning is a on
    | --- | --- |
    | `households/family/members/FIRST_PARENT_UID` | `name` (string): preferred parent name |
    | `households/family/members/SECOND_PARENT_UID` | `name` (string): preferred parent name |
-   | `households/family/children/ferdinand` | `name` (string): `Ferdinand` |
-   | `households/family/children/johann` | `name` (string): `Johann` |
 
 3. The app observes membership and opens the checklist when access is granted. The stored member name is administrative only; acknowledgement names come from each parent's Google profile.
 4. Create your actual tasks in the app. It does not create medication examples or assume times or instructions for them.
 
 **Haushalt** is a built-in section alongside the children. It requires no profile document or manual database initialization. When updating an existing installation, publish the current `firebase/firestore.rules` (or run the rules deployment command above) before saving household tasks: the rules now also allow `childId: "haushalt"`.
 
-Each child has a bear icon inspired by `bear.jpg`. Choose its color under **Einstellungen → Kinder → Name & Bärenfarbe**. Color and name changes sync to both parents. Existing child documents need no manual changes: absent `bearColor` fields default to blue for Ferdinand and rose for Johann. Publish the updated rules before saving colors; they now allow the optional `bearColor` field (`BLUE`, `ROSE`, `GREEN`, `HONEY`, `BROWN`, `PURPLE`).
+Create children in **Einstellungen → Eure Kinder** / **Settings → Your children**.
+Up to ten active profiles can have their own name, icon and colour; archived profiles
+retain their data. Existing Johann/Ferdinand profiles migrate automatically without
+changing their IDs or history. Publish current rules and update both phones before
+using dynamic selections. See [dynamic profiles and migration](DYNAMIC_CHILDREN.md).
 
 Removing a membership document revokes future server access. As with any offline app, data previously downloaded to that device may remain in its local cache; removing membership cannot remotely erase an offline phone.
 
@@ -139,7 +141,7 @@ Verlauf dates refer to when an action was recorded, not the task/appointment's s
 
 **Statistik** is available through the **Baum links neben dem Titel** menu in the top bar. Choose **7 / 30 / 90 Tage** (default 90), then browse earlier adjacent periods with the bottom arrows; **Zum aktuellen Zeitraum** resets the period. Changing duration resets to the current period. The page has independent period state and includes all parents/children regardless of filters selected elsewhere. Einstellungen remains behind the gear button.
 
-Event totals and stacked bars use the same recorded action dates, kinds, colors and known legacy data as Verlauf. Breakdowns show parents, Ferdinand/Johann/**Beide Kinder**/Haushalt, and Monday–Sunday, retaining unknown references so totals reconcile. Confirmations credit **Erledigt von**; other events credit their author. **Erledigte Aufgaben** separately counts each occurrence once using its earliest remaining valid confirmation (event ID breaks timestamp ties), including corrections made outside the selected period. A later correction can therefore change an earlier period's completed-task count; raw event counts remain historical. No new Firebase rules or collections are needed for statistics.
+Event totals and stacked bars use the same recorded action dates, kinds, colors and known legacy data as Verlauf. Breakdowns show parents, dynamic children/Haushalt, and Monday–Sunday, retaining unknown references. Shared child assignments count for each participant; parent/weekday and overall totals count each event once. Confirmations credit **Erledigt von**; other events credit their author. **Erledigte Aufgaben** separately counts each occurrence once using its earliest remaining valid confirmation (event ID breaks timestamp ties), including corrections made outside the selected period. A later correction can therefore change an earlier period's completed-task count; raw event counts remain historical. No new Firebase rules or collections are needed for statistics.
 
 ## Settings and live family notifications
 
@@ -193,7 +195,7 @@ All-day dates use UTC midnight boundaries with an exclusive next-day end; timed 
 
 Publish the complete updated `firebase/firestore.rules` before installing this build on both phones. It adds member-only `listItems`, `listActivity` and `listLabels` access; no manual database documents, migration, signing changes or Cloud Functions are needed. Missing rules prevent all eleven collections from reaching a fully synchronized state.
 
-The bottom bar includes **Einkaufsliste**; **Geschenkideen** is available by tapping the tree beside the title. Both use title/notes without dates or parent assignments; shopping quantities can be written in the title. Gift ideas belong to Ferdinand, Johann or both. Tick an item to buy it, or reopen it from the collapsed **Gekauft** section. Adding and buying/reopening work offline with pending synchronization; editing, deleting/restoring and label management require a current connection. Tap a card for details. Deletion moves it to **Baum → Papierkorb** and preserves activity and purchase state. Home always ends with the **current** open shopping list, even while browsing another date; child/parent filters do not restrict it.
+The bottom bar includes **Einkaufsliste**; **Geschenkideen** is available by tapping the tree beside the title. Both use title/notes without dates or parent assignments; shopping quantities can be written in the title. Gift ideas can belong to any selection of active children. Tick an item to buy it, or reopen it from the collapsed **Gekauft** section. Adding and buying/reopening work offline with pending synchronization; editing, deleting/restoring and label management require a current connection. Tap a card for details. Deletion moves it to **Baum → Papierkorb** and preserves activity and purchase state. Home always ends with the **current** open shopping list, even while browsing another date; child/parent filters do not restrict it.
 
 Under **Einstellungen → Labels → Labels verwalten**, configure shopping labels, gift occasions and givers separately. **Vorschläge** optionally adds Supermarkt/Drogerie, Weihnachten/Ostern/Geburtstag or Oma/Opa. Labels have editable names/colors and can be archived/reactivated. Up to six labels may be selected per item. Archiving preserves existing references and history. A giver label is descriptive and does not assign responsibility to a parent. Both new introduction banners use the existing **Alltagsgedanken anzeigen** setting.
 
@@ -248,3 +250,15 @@ Before installing this update, publish the current `firebase/firestore.rules` an
 Hold an open entry's drag handle and move it, including toward the viewport edge to scroll. Tapping the handle offers Nach oben/Nach unten, also available as accessibility actions. Sorting requires a current connection and supports up to 1000 retained item IDs per list. The order is shared between parents, independent per list, and used by Home's shopping section. Existing lists stay alphabetical until sorted; new items append alphabetically after the saved positions. Filters do not discard hidden positions. Bought entries retain their recent-purchase ordering; reopening or restoring returns an item to its saved position.
 
 Only the order document changes: item content, purchase state, immutable activity, notifications and statistics remain unchanged. Orders have versions; simultaneous/stale reorders are rejected with a message rather than silently overwriting the other parent's order. The preview rolls back on failure or when a list/filter changes during dragging.
+
+
+### Default appointment duration
+
+Set **Einstellungen → Termine → Standarddauer für Termine** / **Settings →
+Appointments → Default appointment duration** independently on each phone. The
+default is 60 minutes; presets and a numeric field accept 1–720 minutes. New
+appointments start with that duration. In new, edit and import dialogs, selecting
+a start time updates the end time until you explicitly select an end time during
+that dialog session. Opening an existing appointment does not change its times.
+The automatic suggestion stops at 23:59 with a note if the duration does not fit;
+appointments still have to end after their start on the same day.

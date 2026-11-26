@@ -94,7 +94,9 @@ internal fun FamilyListPage(
     fun visible(bought: Boolean) =
         listItems(state.listItems, state.listActivity, kind, bought, reorder.order ?: order.itemIds)
             .filter {
-                (kind == FamilyListKind.SHOPPING || it.recipient?.matches(child) == true) &&
+                (kind == FamilyListKind.SHOPPING ||
+                    (it.recipient?.matches(child) == true &&
+                        (child != null || it.recipient.visibleFor(state.children)))) &&
                     matchesListLabels(it, labels.toSet(), state.listLabels)
             }
     val open = visible(false)
@@ -537,7 +539,15 @@ private fun FamilyListEditor(
     var title by rememberSaveable { mutableStateOf(existing?.title.orEmpty()) }
     var notes by rememberSaveable { mutableStateOf(existing?.notes.orEmpty()) }
     var recipient by rememberSaveable {
-        mutableStateOf(existing?.recipient ?: AppointmentRecipient.BOTH_CHILDREN)
+        mutableStateOf(
+            existing?.recipient
+                ?: state.children
+                    .filterNot { it.archived }
+                    .map { it.id }
+                    .toSet()
+                    .takeIf { it.isNotEmpty() }
+                    ?.let(AppointmentRecipient::children)
+        )
     }
     var selectedLabels by rememberSaveable {
         mutableStateOf(ArrayList(existing?.labelIds.orEmpty()))
@@ -549,7 +559,8 @@ private fun FamilyListEditor(
                 .firstOrNull { it.id == existing.id }
                 ?.let { it.version != existing.version || it.deleted } != false
     val canSave =
-        !busy &&
+        (target.kind == FamilyListKind.SHOPPING || recipient != null) &&
+            !busy &&
             !stale &&
             (existing == null || (!state.fromCache && !state.pending && state.error == null))
     ItemDetailsDialog(
@@ -606,18 +617,16 @@ private fun FamilyListEditor(
         )
         if (target.kind == FamilyListKind.GIFTS)
             DetailSection(text(TextKey.WHO_IS_IT_FOR), AppTheme.colors.background) {
-                listOf(
-                        AppointmentRecipient.FERDINAND,
-                        AppointmentRecipient.JOHANN,
-                        AppointmentRecipient.BOTH_CHILDREN,
-                    )
-                    .forEach { choice ->
-                        FilterChip(
-                            recipient == choice,
-                            { recipient = choice },
-                            label = { Text(appointmentRecipientName(choice, state.sections)) },
-                        )
+                if (recipient != null)
+                    ChildRecipientPicker(
+                        state.children,
+                        requireNotNull(recipient),
+                        household = false,
+                        enabled = !busy,
+                    ) {
+                        recipient = it
                     }
+                else Text(text(TextKey.ADD_CHILD_FIRST))
             }
         Text(
             text(TextKey.UP_TO_6_LABELS_IN_TOTAL_YOU_CAN_MANAGE_SHARED_LABELS_IN_SETTINGS),

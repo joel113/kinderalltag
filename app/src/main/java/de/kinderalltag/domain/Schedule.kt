@@ -19,7 +19,11 @@ enum class BearColor(val argb: Long) {
     GREEN(0xFF4C8061),
     HONEY(0xFFD5A038),
     BROWN(0xFF825B46),
-    PURPLE(0xFF8060A0);
+    PURPLE(0xFF8060A0),
+    TEAL(0xFF008577),
+    ORANGE(0xFFD16524),
+    CORAL(0xFFE16B70),
+    INDIGO(0xFF5555A6);
 
     companion object {
         fun fromStored(value: String?, childId: String): BearColor =
@@ -27,10 +31,26 @@ enum class BearColor(val argb: Long) {
     }
 }
 
+enum class ChildIconId {
+    BEAR,
+    FOX,
+    RABBIT,
+    LION,
+    ELEPHANT,
+    WHALE,
+    PENGUIN,
+    DINOSAUR,
+    TRACTOR,
+    UNICORN,
+}
+
 data class Child(
     val id: String,
     val name: String,
     val bearColor: BearColor = BearColor.fromStored(null, id),
+    val icon: ChildIconId = ChildIconId.BEAR,
+    val archived: Boolean = false,
+    val version: Long = 0,
 )
 
 val HOUSEHOLD_SECTION

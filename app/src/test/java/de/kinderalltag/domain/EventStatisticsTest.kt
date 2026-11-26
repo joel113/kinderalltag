@@ -78,7 +78,7 @@ class EventStatisticsTest {
     }
 
     private fun assertReconciles(result: EventStatistics) {
-        listOf(result.parents, result.subjects, result.weekdays).forEach { rows ->
+        listOf(result.parents, result.weekdays).forEach { rows ->
             assertEquals(result.total.events, rows.sumOf { it.counts.events })
             assertEquals(result.total.completedTasks, rows.sumOf { it.counts.completedTasks })
             HistoryKind.entries.forEach { kind ->
@@ -113,7 +113,7 @@ class EventStatisticsTest {
         assertEquals(0, result.total.completedTasks)
         assertEquals(listOf("a", "b"), result.parents.map { it.id })
         assertEquals(
-            listOf("ferdinand", "johann", "both", "haushalt", "shopping"),
+            listOf("ferdinand", "johann", "haushalt", "shopping"),
             result.subjects.map { it.id },
         )
         assertEquals(DayOfWeek.entries.map { it.name }, result.weekdays.map { it.id })
@@ -190,7 +190,7 @@ class EventStatisticsTest {
     }
 
     @Test
-    fun bothChildrenAndHouseholdAreAdditiveAndUnknownReferencesAreRetained() {
+    fun sharedAppointmentsCountForEachChildButOnlyOnceOverall() {
         val unknown =
             completion("unknown").copy(occurrenceId = "missing", authorId = "", authorName = "")
         val result =
@@ -202,10 +202,10 @@ class EventStatisticsTest {
                     appointment("ferd", AppointmentRecipient.FERDINAND),
                 ),
             )
-        assertEquals(1, result.subjects.single { it.id == "both" }.counts.events)
+        assertEquals(4, result.total.events)
         assertEquals(1, result.subjects.single { it.id == "haushalt" }.counts.events)
-        assertEquals(1, result.subjects.single { it.id == "ferdinand" }.counts.events)
-        assertEquals(0, result.subjects.single { it.id == "johann" }.counts.events)
+        assertEquals(2, result.subjects.single { it.id == "ferdinand" }.counts.events)
+        assertEquals(1, result.subjects.single { it.id == "johann" }.counts.events)
         assertEquals(1, result.subjects.single { it.id == "unknown" }.counts.completedTasks)
         assertEquals("Unbekannt", result.parents.single { it.id == "__unknown__" }.label)
         assertReconciles(result)

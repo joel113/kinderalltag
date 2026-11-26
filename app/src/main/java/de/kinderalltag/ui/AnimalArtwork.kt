@@ -6,15 +6,19 @@ import androidx.compose.ui.graphics.drawscope.*
 import kotlin.math.*
 
 // Scalable animal illustrations drawn with Compose Canvas.
-internal fun DrawScope.drawAnimalMotif(art: ThemeArtwork, c: AppPalette) {
+internal fun DrawScope.drawAnimalMotif(
+    art: ThemeArtwork,
+    c: AppPalette,
+    profileColor: Color? = null,
+) {
     when (art) {
-        ThemeArtwork.LION -> lion(c)
+        ThemeArtwork.LION -> lion(c, profileColor)
         ThemeArtwork.FOX -> fox(c)
-        ThemeArtwork.RABBIT -> rabbit(c)
+        ThemeArtwork.RABBIT -> rabbit(c, profileColor)
         ThemeArtwork.ELEPHANT -> elephant(c)
         ThemeArtwork.WHALE -> whale(c)
         ThemeArtwork.ANIMAL_HOUSE -> animalHouse(c)
-        ThemeArtwork.PENGUIN -> penguin(c)
+        ThemeArtwork.PENGUIN -> penguin(c, profileColor)
         else -> error("Not an animal illustration: $art")
     }
 }
@@ -38,7 +42,7 @@ private fun DrawScope.animalSmile(c: AppPalette, y: Float) {
     )
 }
 
-private fun DrawScope.lion(c: AppPalette) {
+private fun DrawScope.lion(c: AppPalette, profileColor: Color?) {
     repeat(12) { index ->
         val angle = index * PI / 6
         drawCircle(
@@ -47,7 +51,7 @@ private fun DrawScope.lion(c: AppPalette) {
             Offset(50f + 32f * cos(angle).toFloat(), 50f + 32f * sin(angle).toFloat()),
         )
     }
-    val fur = lerp(StatusColors.yellow, c.secondaryContainer, 0.3f)
+    val fur = profileColor ?: lerp(StatusColors.yellow, c.secondaryContainer, 0.3f)
     drawCircle(fur, 10f, Offset(29f, 29f))
     drawCircle(fur, 10f, Offset(71f, 29f))
     drawCircle(c.artCoral, 5f, Offset(29f, 29f))
@@ -110,8 +114,8 @@ private fun DrawScope.fox(c: AppPalette) {
     animalSmile(c, 69f)
 }
 
-private fun DrawScope.rabbit(c: AppPalette) {
-    val fur = Color(0xFFE3C9A0)
+private fun DrawScope.rabbit(c: AppPalette, profileColor: Color?) {
+    val fur = profileColor ?: Color(0xFFE3C9A0)
     rotate(-12f, Offset(36f, 46f)) {
         drawOval(fur, Offset(27f, 3f), Size(19f, 53f))
         drawOval(c.artCoral.copy(alpha = 0.4f), Offset(33f, 11f), Size(7f, 32f))
@@ -217,8 +221,8 @@ private fun DrawScope.animalHouse(c: AppPalette) {
     }
 }
 
-private fun DrawScope.penguin(c: AppPalette) {
-    val feathers = Color(0xFF74756C)
+private fun DrawScope.penguin(c: AppPalette, profileColor: Color?) {
+    val feathers = profileColor ?: Color(0xFF74756C)
     val belly = Color(0xFFFFF7E5)
     drawPath(
         Path().apply {

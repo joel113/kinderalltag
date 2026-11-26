@@ -183,6 +183,7 @@ object ReminderScheduler {
             if (
                 occurrence != null &&
                     isResponsible(occurrence.details.responsibleParentId, state.uid) &&
+                    occurrence.details.recipient.visibleFor(state.children) &&
                     occurrence.details.endInstant > now &&
                     occurrence.reminderFingerprint() == item.optString("fingerprint")
             ) {
@@ -307,7 +308,7 @@ class ReminderReceiver : BroadcastReceiver() {
         ReminderScheduler.restore(context)
         if (id == "calendar_refresh") ReminderScheduler.refresh(context)
         if (item == null) return
-        if (item.optString("kind", "task") == "task") {
+        run {
             val pending = goAsync()
             CoroutineScope(Dispatchers.Main.immediate).launch {
                 try {
@@ -327,31 +328,45 @@ class ReminderReceiver : BroadcastReceiver() {
                     }
                     val state = repository.state.value
                     if (state.uid != uid || !state.authorized || !state.loaded) return@launch
-                    if (
-                        !FamilyReminders.taskNeedsReminder(
-                            id,
-                            LocalDate.parse(item.getString("date")),
-                            Instant.ofEpochMilli(item.getLong("at")),
-                            uid,
-                            state.revisions,
-                            state.events,
-                            state.itemOperations,
-                            Instant.now(),
-                        )
-                    )
-                        return@launch
+                    val valid =
+                        if (item.optString("kind", "task") == "task")
+                            FamilyReminders.taskNeedsReminder(
+                                id,
+                                LocalDate.parse(item.getString("date")),
+                                Instant.ofEpochMilli(item.getLong("at")),
+                                uid,
+                                state.revisions,
+                                state.events,
+                                state.itemOperations,
+                                Instant.now(),
+                                state.children,
+                            )
+                        else
+                            FamilyReminders.appointmentNeedsReminder(
+                                id,
+                                LocalDate.parse(item.getString("date")),
+                                Instant.ofEpochMilli(item.getLong("at")),
+                                item.optString("fingerprint"),
+                                uid,
+                                state.children,
+                                state.appointments,
+                                state.appointmentExceptions,
+                                state.appointmentActivity,
+                                state.itemOperations,
+                                Instant.now(),
+                            )
+                    if (!valid) return@launch
                     showNotification(context, id, item)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.w("KinderalltagReminder", "Task reminder validation failed", e)
+                    Log.w("KinderalltagReminder", "Reminder validation failed", e)
                 } finally {
                     pending.finish()
                 }
             }
             return
         }
-        showNotification(context, id, item)
     }
 
     private fun showNotification(context: Context, id: String, item: JSONObject) {

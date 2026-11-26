@@ -109,7 +109,7 @@ internal fun ItemOperation.encodeOperation(): Map<String, Any?> =
         "replacementStartAt" to
             replacementStartMillis?.let { com.google.firebase.Timestamp(java.util.Date(it)) },
         "childId" to childId,
-        "recipient" to recipient?.name,
+        "recipient" to recipient?.stored(),
         "task" to task?.snapshotMap(),
         "appointment" to appointment?.snapshotMap(),
         "restoresId" to restoresId,
@@ -135,7 +135,7 @@ internal fun decodeItemOperation(doc: DocumentSnapshot) =
         actualStartMillis = doc.getTimestamp("actualStartAt")?.toDate()?.time ?: 0,
         replacementStartMillis = doc.getTimestamp("replacementStartAt")?.toDate()?.time,
         childId = doc.getString("childId"),
-        recipient = doc.getString("recipient")?.let(AppointmentRecipient::valueOf),
+        recipient = doc.get("recipient")?.let(AppointmentRecipient::fromStored),
         task =
             (doc.get("task") as? Map<*, *>)
                 ?.let(::taskSnapshot)

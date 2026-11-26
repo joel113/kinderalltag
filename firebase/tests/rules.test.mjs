@@ -756,3 +756,134 @@ test('simultaneous list reorders accept only one writer for the next version', a
   assert.equal(saved.version, 2);
   assert.deepEqual([...saved.itemIds].sort(), ['bread', 'milk']);
 });
+
+const registryRef = db => doc(db, `${path}/childRegistry/state`);
+async function initializeChildren(db) {
+  const old = await getDoc(registryRef(db));
+  if (old.exists()) return old.data();
+  const knownIds = [];
+  for (const id of ['ferdinand', 'johann']) if ((await getDoc(doc(db, `${path}/children/${id}`))).exists()) knownIds.push(id);
+  const data = { schemaVersion: 2, version: 0, knownIds, activeIds: knownIds, changedId: '' };
+  await setDoc(registryRef(db), data);
+  return data;
+}
+async function changeChild(db, id, extra = {}, registrySeed = null) {
+  const registry = registrySeed ?? (await getDoc(registryRef(db))).data();
+  const old = await getDoc(doc(db, `${path}/children/${id}`));
+  const child = { name: id, bearColor: 'TEAL', icon: 'FOX', archived: false,
+    ...(old.exists() ? old.data() : {}), ...extra, version: old.exists() ? (old.data().version ?? 0) + 1 : 0 };
+  const activeIds = registry.activeIds.filter(value => value !== id);
+  if (!child.archived) activeIds.push(id);
+  const batch = writeBatch(db);
+  batch.set(doc(db, `${path}/children/${id}`), child);
+  batch.set(registryRef(db), { schemaVersion: 2, version: registry.version + 1,
+    knownIds: [...new Set([...registry.knownIds, id])].sort(), activeIds: activeIds.sort(), changedId: id });
+  return batch.commit();
+}
+
+test('child migration preserves existing documents and initializes exactly the legacy IDs', async () => {
+  const db = dbFor('parent-a');
+  const before = (await getDoc(doc(db, `${path}/children/johann`))).data();
+  await assertFails(setDoc(registryRef(db), { schemaVersion: 2, version: 0, knownIds: [], activeIds: [], changedId: '' }));
+  await assertFails(initializeChildren(dbFor('stranger')));
+  const initial = await initializeChildren(db);
+  assert.deepEqual(initial.knownIds, ['johann']);
+  assert.deepEqual((await getDoc(doc(db, `${path}/children/johann`))).data(), before);
+  assert.deepEqual(await initializeChildren(dbFor('parent-b')), initial);
+  await assertFails(updateDoc(doc(db, `${path}/children/johann`), { name: 'Old client write' }));
+  await assertSucceeds(changeChild(db, 'johann', { name: 'Johann renamed', icon: 'TRACTOR', bearColor: 'INDIGO' }));
+  assert.equal((await getDoc(doc(dbFor('parent-b'), `${path}/children/johann`))).data().name, 'Johann renamed');
+  await assertFails(deleteDoc(doc(db, `${path}/children/johann`)));
+});
+
+test('child lifecycle enforces ten active profiles and preserves archived known IDs', async () => {
+  const db = dbFor('parent-a');
+  await initializeChildren(db);
+  for (let index = 1; index <= 9; index++) await assertSucceeds(changeChild(db, `child-${index}`));
+  await assertFails(changeChild(db, 'eleventh'));
+  await assertSucceeds(changeChild(db, 'johann', { archived: true }));
+  await assertSucceeds(changeChild(dbFor('parent-b'), 'eleventh'));
+  await assertFails(changeChild(db, 'johann', { archived: false }));
+  await assertSucceeds(changeChild(db, 'child-1', { archived: true }));
+  await assertSucceeds(changeChild(db, 'johann', { archived: false }));
+  const registry = (await getDoc(registryRef(db))).data();
+  assert.equal(registry.activeIds.length, 10);
+  assert.equal(registry.knownIds.length, 11);
+  assert.ok(registry.knownIds.includes('child-1'));
+  assert.ok(!(registry.activeIds.includes('child-1')));
+  await assertFails(changeChild(db, 'haushalt'));
+  await assertFails(changeChild(db, 'child-2', { icon: 'UPLOADED_URL' }));
+  await assertFails(changeChild(db, 'child-2', { bearColor: 'INVALID' }));
+  await assertFails(changeChild(db, 'child-2', { name: '' }));
+  await assertFails(updateDoc(registryRef(db), { activeIds: [], version: registry.version + 1 }));
+  await assertFails(updateDoc(doc(db, `${path}/children/child-2`), { archived: true, version: 1 }));
+});
+
+test('concurrent parents cannot consume the same final child slot or overwrite profile edits', async () => {
+  const a = dbFor('parent-a'); const b = dbFor('parent-b');
+  await initializeChildren(a);
+  for (let index = 1; index <= 8; index++) await changeChild(a, `child-${index}`);
+  const seed = (await getDoc(registryRef(a))).data();
+  const results = await Promise.allSettled([changeChild(a, 'last-a', {}, seed), changeChild(b, 'last-b', {}, seed)]);
+  assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+  assert.equal((await getDoc(registryRef(a))).data().activeIds.length, 10);
+  const stale = (await getDoc(registryRef(a))).data();
+  await changeChild(a, 'johann', { name: 'New name' });
+  await assertFails(changeChild(b, 'johann', { name: 'Stale name' }, stale));
+});
+
+test('ten-child recipients and six labels stay within access and expression limits', async () => {
+  const db = dbFor('parent-a');
+  await initializeChildren(db);
+  for (let index = 1; index <= 9; index++) await changeChild(db, `child-${index}`);
+  const ids = (await getDoc(registryRef(db))).data().activeIds;
+  const recipient = { kind: 'CHILDREN', childIds: ids };
+  const series = { ...appointment('parent-a'), details: { ...appointment('parent-a').details, recipient } };
+  await assertSucceeds(setDoc(doc(db, `${path}/appointmentSeries/dynamic`), series));
+  for (const [index, childIds] of [[], [...ids, 'extra'], ['johann', 'johann'], ['unknown'], ['haushalt'], [1]].entries()) {
+    await assertFails(setDoc(doc(db, `${path}/appointmentSeries/bad-recipients-${index}`), {
+      ...series, details: { ...series.details, recipient: { kind: 'CHILDREN', childIds } },
+    }));
+  }
+  const labels = [];
+  for (let index = 0; index < 6; index++) {
+    const label = familyLabel(`dynamic-${index}`, index < 3 ? 'OCCASION' : 'GIVER');
+    labels.push(label);
+    await setDoc(doc(db, `${path}/listLabels/${label.id}`), label);
+  }
+  const gift = familyListItem('dynamic-gift', 'GIFTS', { recipient, labelIds: labels.map(label => label.id) });
+  await assertSucceeds(createFamilyList(db, 'parent-a', gift, { labels }));
+  await assertSucceeds(setDoc(doc(db, `${path}/listActivity/dynamic-purchase`), listAudit('parent-a', gift, 'BOUGHT', 'dynamic-purchase', { labels })));
+  await changeChild(db, 'child-1', { archived: true });
+  await assertSucceeds(setDoc(doc(db, `${path}/listActivity/archived-purchase`), listAudit('parent-a', gift, 'BOUGHT', 'archived-purchase', { labels })));
+  const batch = writeBatch(db);
+  for (const id of ids) batch.set(doc(db, `${path}/revisions/fanout-${id}`), { ...revision('parent-a'), childId: id, taskId: `task-${id}` });
+  await assertSucceeds(batch.commit());
+});
+
+test('dynamic children retain eight-slot completion correction and edit support', async () => {
+  const db = dbFor('parent-a');
+  await initializeChildren(db);
+  await changeChild(db, 'new-child');
+  await seedOperationSource(db);
+  const times = ['00:00', '06:00', '08:00', '10:00', '12:00', '16:00', '18:00', '23:59'];
+  const seconds = [0, 21600, 28800, 36000, 43200, 57600, 64800, 86340];
+  const date = '2027-01-31'; const occurrenceId = `task-1_source_${date}_28800`;
+  const task = { ...taskSnapshot(), childId: 'new-child', times, slotOrigins: seconds.map(value => `source|${value}`),
+    frequency: 'MONTHS', interval: 3, responsibleParentId: 'parent-b' };
+  const snapshot = { revision: task, date, time: '08:00', id: occurrenceId, originalDate: date, originalTime: '08:00', sourceId: 'source' };
+  await assertSucceeds(setDoc(doc(db, `${path}/events/dynamic-completion`), event('parent-a', {
+    date, occurrenceId, taskSnapshot: snapshot, completedById: 'parent-b', completedByName: 'Mama',
+  })));
+  await assertSucceeds(setDoc(doc(db, `${path}/events/dynamic-retract`), event('parent-a', {
+    kind: 'RETRACT', targetId: 'dynamic-completion', date, occurrenceId, taskSnapshot: snapshot,
+  })));
+  await assertSucceeds(writeOperation(db, 'dynamic-following', itemOperation('parent-a', {
+    childId: 'new-child', action: 'EDIT', scope: 'FOLLOWING', task,
+    actualStartAt: Timestamp.fromMillis(Date.now() + 86400000), version: 1,
+  })));
+  await changeChild(db, 'new-child', { archived: true });
+  await assertSucceeds(setDoc(doc(db, `${path}/events/archived-correction`), event('parent-a', {
+    kind: 'RETRACT', targetId: 'dynamic-completion', date, occurrenceId, taskSnapshot: snapshot,
+  })));
+});

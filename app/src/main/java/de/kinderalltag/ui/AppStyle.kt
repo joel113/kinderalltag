@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.kinderalltag.domain.BearColor
 import de.kinderalltag.domain.Child
+import de.kinderalltag.domain.ChildIconId
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -64,6 +65,26 @@ internal fun ChildIcon(child: Child, modifier: Modifier = Modifier) {
     val colors = theme.colors
     if (child.id == "haushalt") {
         AppIllustration(IllustrationRole.HOUSEHOLD, modifier)
+    } else if (child.icon != ChildIconId.BEAR) {
+        Canvas(modifier.clearAndSetSemantics {}) {
+            scale(size.width / 100f, size.height / 100f, pivot = Offset.Zero) {
+                val selected = Color(child.bearColor.argb)
+                val palette =
+                    colors.copy(
+                        artBlue = selected,
+                        artGreen = selected,
+                        artCoral = selected,
+                        primaryContainer = selected,
+                    )
+                when (child.icon) {
+                    ChildIconId.DINOSAUR -> dinosaur(palette)
+                    ChildIconId.TRACTOR -> drawVehicleMotif(ThemeArtwork.TRACTOR, palette)
+                    ChildIconId.UNICORN -> drawMagicMotif(ThemeArtwork.UNICORN, palette)
+                    else ->
+                        drawAnimalMotif(ThemeArtwork.valueOf(child.icon.name), palette, selected)
+                }
+            }
+        }
     } else {
         Canvas(modifier.clearAndSetSemantics {}) {
             scale(size.width / 100f, size.height / 100f, pivot = Offset.Zero) {

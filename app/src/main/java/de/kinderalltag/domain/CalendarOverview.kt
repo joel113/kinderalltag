@@ -103,6 +103,7 @@ fun taskCalendarPreviews(
     onlyMine: Boolean,
     events: List<CareEvent> = emptyList(),
     operations: List<ItemOperation> = emptyList(),
+    children: List<Child> = emptyList(),
 ): Map<LocalDate, List<CalendarPreviewItem>> =
     dates.associateWith { date ->
         ManagedTasks.occurrences(revisions, events, operations, date)
@@ -110,6 +111,8 @@ fun taskCalendarPreviews(
                 val it = occurrence.revision
                 it.isDue(date) &&
                     (sectionId == null || it.childId == sectionId) &&
+                    (sectionId != null ||
+                        children.none { child -> child.archived && child.id == it.childId }) &&
                     (!onlyMine || isResponsible(it.responsibleParentId, uid))
             }
             .groupBy { it.revision.taskId }
@@ -145,6 +148,7 @@ fun appointmentCalendarPreviews(
     onlyMine: Boolean,
     activity: List<AppointmentActivity> = emptyList(),
     operations: List<ItemOperation> = emptyList(),
+    children: List<Child>? = null,
 ): Map<LocalDate, List<CalendarPreviewItem>> {
     if (dates.isEmpty()) return emptyMap()
     return ManagedAppointments.occurrences(
@@ -157,6 +161,9 @@ fun appointmentCalendarPreviews(
         )
         .filter {
             it.details.recipient.matches(sectionId) &&
+                (sectionId != null ||
+                    children == null ||
+                    it.details.recipient.visibleFor(children)) &&
                 (!onlyMine || isResponsible(it.details.responsibleParentId, uid))
         }
         .groupBy { it.details.date }

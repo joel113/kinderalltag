@@ -14,6 +14,7 @@ fun overdueTaskOccurrences(
     childId: String? = null,
     uid: String? = null,
     onlyMine: Boolean = false,
+    children: List<Child> = emptyList(),
 ): List<Occurrence> {
     if (days <= 0) return emptyList()
     val past =
@@ -37,6 +38,8 @@ fun overdueTaskOccurrences(
             (it.revision.frequency == Frequency.ONCE || latestDue[it.revision.taskId] == it.id) &&
                 Schedule.activeCompletions(eventsByOccurrence[it.id].orEmpty(), it.id).isEmpty() &&
                 (childId == null || it.revision.childId == childId) &&
+                (childId != null ||
+                    children.none { child -> child.archived && child.id == it.revision.childId }) &&
                 (!onlyMine || isResponsible(it.revision.responsibleParentId, uid))
         }
         .sortedWith(

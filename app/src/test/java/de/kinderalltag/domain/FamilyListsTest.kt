@@ -193,10 +193,11 @@ class FamilyListsTest {
         assertEquals(4, stats.total.events)
         assertEquals(1, stats.total.boughtShopping)
         assertEquals(1, stats.total.boughtGifts)
-        assertEquals(1, stats.subjects.single { it.id == "both" }.counts.boughtGifts)
+        assertEquals(1, stats.subjects.single { it.id == "johann" }.counts.boughtGifts)
+        assertEquals(1, stats.subjects.single { it.id == "ferdinand" }.counts.boughtGifts)
         assertEquals(1, stats.subjects.single { it.id == "shopping" }.counts.boughtShopping)
         assertEquals(0, stats.parents.single { it.id == "b" }.counts.boughtShopping)
-        assertEquals(stats.total.events, stats.subjects.sumOf { it.counts.events })
+        assertEquals(stats.total.events + 2, stats.subjects.sumOf { it.counts.events })
         assertEquals(stats.total.events, stats.weekdays.sumOf { it.counts.events })
     }
 

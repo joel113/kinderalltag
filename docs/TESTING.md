@@ -318,3 +318,40 @@ Schedule reminders, change language before delivery, and verify background/cold-
 NativePickerHostTest uses Robolectric 4.16.1 with Android resources, simulating API 32 and 35. It opens date and time dialogs in German and English, asserts they retain the activity's WindowManager and owner, rejects application/configuration-only contexts, blocks finishing/destroyed activities, recreates the activity and opens a fresh picker, and checks graceful handling of an expired window token. Run with the documented JDK 17 or 21; Robolectric cannot instrument JDK 27 classes. The first run downloads test-only Android runtime artifacts; no emulator image or Firebase initialization is needed.
 
 Phone acceptance: edit an unfinished task, choose a different date, and save; repeat with a past date and with each daily time slot. Check appointment start/end dates, optional end-date clearing, history/date-search pickers, and time pickers in German/English/System with 12/24-hour settings. Rotate or change app language while a picker is open, dismiss by Back/outside tap, and reopen; there must be no crash or leaked window. Runtime tests do not replace this physical-device check.
+
+
+## Dynamic children acceptance checks
+
+Follow [the migration rollout](DYNAMIC_CHILDREN.md) with backed-up data. Record
+Johann/Ferdinand IDs, existing task occurrence IDs, completion counts and recent
+history before installing. Update both phones, launch online and confirm those
+records are unchanged. Reopening either app must not repeat initialization.
+
+- Rename/recolour/change an icon on one phone and verify the other phone receives it.
+  Repeat in German/English and different themes. Existing profile colours remain.
+- Add up to ten active children. Try simultaneous additions for the last slot from
+  both phones. Only one succeeds. Verify offline profile editing cannot queue writes.
+- Archive one child, use the freed slot, and verify restoration is unavailable until
+  another slot is freed. Historical tasks, completions, gifts and statistics remain.
+  Selecting the archived child's filter reveals their records.
+- Create a task for two children. Complete/postpone one copy; the other stays
+  independent. Create an appointment/gift for an arbitrary subset, including all ten.
+  Add a child later and verify older “all children” selections remain unchanged.
+- Archive a child with task/appointment alarms already scheduled. After synchronization
+  neither phone should deliver those alarms for exclusively archived recipients.
+  Shared appointments involving another active child still remind normally.
+- Check calendar previews, future/past task previews, normal lists and history filters.
+  Verify shared statistics count once overall and for each participating child.
+- Open the same child editor on both phones. Save one, then the other; the second
+  should report the conflict and require reopening, preserving the first change.
+
+
+## Appointment duration
+
+Set a 45-minute default, reopen Settings to check persistence, then open a new
+appointment and select 10:30 and 11:00 as successive start times. End times should
+be 11:15 and 11:45. Select an end time manually, then change the start again: the
+end must remain unchanged, including after rotating the phone. Reopen the dialog
+to begin a fresh editing session. Repeat with an existing appointment and an import;
+opening alone must preserve the original times. Check German/English labels, invalid
+duration input, a late-night start (no midnight wrap), and all-day appointments.

@@ -4,13 +4,16 @@ import de.kinderalltag.text.*
 import java.time.Instant
 
 fun appointmentRecipientName(recipient: AppointmentRecipient, sections: List<Child>): String =
-    when (recipient) {
-        AppointmentRecipient.FERDINAND ->
-            sections.firstOrNull { it.id == "ferdinand" }?.name ?: "Ferdinand"
-        AppointmentRecipient.JOHANN -> sections.firstOrNull { it.id == "johann" }?.name ?: "Johann"
-        AppointmentRecipient.BOTH_CHILDREN -> text(TextKey.BOTH_CHILDREN)
-        AppointmentRecipient.HOUSEHOLD -> text(TextKey.HOUSEHOLD)
-    }
+    if (recipient.household) text(TextKey.HOUSEHOLD)
+    else
+        recipient.childIds.sorted().joinToString(", ") { id ->
+            sections.firstOrNull { it.id == id }?.name
+                ?: when (id) {
+                    "ferdinand" -> "Ferdinand"
+                    "johann" -> "Johann"
+                    else -> text(TextKey.AREA)
+                }
+        }
 
 data class FamilyReminder(
     val id: String,
@@ -38,16 +41,49 @@ object FamilyReminders {
         events: List<CareEvent>,
         operations: List<ItemOperation>,
         now: Instant,
+        children: List<Child> = emptyList(),
     ): Boolean {
         if (Schedule.activeCompletions(events, id).isNotEmpty()) return false
         val occurrence =
             ManagedTasks.occurrences(revisions, events, operations, date).firstOrNull {
                 it.id == id
             } ?: return false
-        return isResponsible(occurrence.revision.responsibleParentId, uid) &&
+        return children.none { it.id == occurrence.revision.childId && it.archived } &&
+            isResponsible(occurrence.revision.responsibleParentId, uid) &&
             occurrence.instant == scheduledAt &&
             occurrence.instant <= now &&
             now < date.plusDays(1).atStartOfDay(FAMILY_ZONE).toInstant()
+    }
+
+    fun appointmentNeedsReminder(
+        id: String,
+        date: java.time.LocalDate,
+        scheduledAt: Instant,
+        fingerprint: String,
+        uid: String?,
+        children: List<Child>,
+        appointments: List<AppointmentSeries>,
+        exceptions: List<AppointmentException>,
+        activity: List<AppointmentActivity>,
+        operations: List<ItemOperation>,
+        now: Instant,
+    ): Boolean {
+        val occurrence =
+            ManagedAppointments.occurrences(
+                    appointments,
+                    exceptions,
+                    activity,
+                    operations,
+                    date,
+                    date,
+                )
+                .firstOrNull { it.id == id } ?: return false
+        return occurrence.details.recipient.visibleFor(children) &&
+            isResponsible(occurrence.details.responsibleParentId, uid) &&
+            occurrence.details.reminderInstant == scheduledAt &&
+            scheduledAt <= now &&
+            occurrence.details.endInstant > now &&
+            occurrence.reminderFingerprint() == fingerprint
     }
 
     fun plan(
@@ -74,7 +110,10 @@ object FamilyReminders {
                     (it.instant > now || it.id in pendingIds) &&
                         Schedule.activeCompletions(events, it.id).isEmpty()
                 }
-                .filter { isResponsible(it.revision.responsibleParentId, uid) }
+                .filter {
+                    isResponsible(it.revision.responsibleParentId, uid) &&
+                        sections.none { child -> child.id == it.revision.childId && child.archived }
+                }
                 .map {
                     FamilyReminder(
                         it.id,
@@ -98,7 +137,10 @@ object FamilyReminders {
                     today.minusDays(1),
                     today.plusDays(8),
                 )
-                .filter { isResponsible(it.details.responsibleParentId, uid) }
+                .filter {
+                    isResponsible(it.details.responsibleParentId, uid) &&
+                        it.details.recipient.visibleFor(sections)
+                }
                 .mapNotNull {
                     val at = it.details.reminderInstant ?: return@mapNotNull null
                     if (
@@ -137,7 +179,9 @@ fun reminderDisplayTitle(
         when {
             subjectId == "haushalt" || recipient == AppointmentRecipient.HOUSEHOLD ->
                 text(TextKey.HOUSEHOLD)
-            recipient == AppointmentRecipient.BOTH_CHILDREN -> text(TextKey.BOTH_CHILDREN)
+            recipient == AppointmentRecipient.BOTH_CHILDREN &&
+                subjectName in listOf("Beide Kinder", "Both children") ->
+                text(TextKey.BOTH_CHILDREN)
             else -> subjectName?.takeIf { it.isNotBlank() } ?: text(TextKey.AREA)
         }
     return "$subject: $title"

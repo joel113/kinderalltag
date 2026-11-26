@@ -1,6 +1,6 @@
 # Kinderalltag
 
-A shared Android checklist for Ferdinand and Johann, with German and English interfaces. Both parents can manage routines, acknowledge each occurrence, and see who did what and when.
+A shared Android checklist for families with up to ten active children, with German and English interfaces. Both parents can manage routines, acknowledge each occurrence, and see who did what and when.
 
 Native Kotlin / Jetpack Compose, Android 8+, Firebase Google sign-in and Cloud Firestore. There is no application server to run. Firebase configuration and the two household accounts must be provisioned before shared use.
 
@@ -16,6 +16,7 @@ Without `app/google-services.json`, the app builds into a setup screen. With con
 
 - German/English language support: follow the phone or choose System, Deutsch, or English independently per phone in Settings.
 - Shared today view, grouped by child, with completion details and the current shopping list.
+- Shared child profiles with ten icons and colours, archiving, and automatic compatibility with existing Johann/Ferdinand data. See [migration instructions](docs/DYNAMIC_CHILDREN.md).
 - Garden, Play, light Space, Animal, Vehicle, Nature, Farm and Magic themes with locally drawn illustrations and matching bear variants and launcher icons, selectable per phone.
 - Optionally retain unfinished past tasks on the home screen for 1–365 days (default 7); a Settings switch hides them without resetting the period. Recurring tasks retain only the latest due execution.
 - Optional future tasks integrated into the home task list: choose 1–50 tasks within the next 1–365 days under Einstellungen → Startseite (default preview range: 7 days).

@@ -14,6 +14,7 @@ fun upcomingTaskOccurrences(
     onlyMine: Boolean = false,
     days: Int = 7,
     excludedTaskIds: Set<String> = emptySet(),
+    children: List<Child> = emptyList(),
 ): List<Occurrence> {
     if (limit <= 0 || days <= 0) return emptyList()
     val through = after.plusDays(days.toLong())
@@ -44,6 +45,8 @@ fun upcomingTaskOccurrences(
         }
         .filter {
             (childId == null || it.revision.childId == childId) &&
+                (childId != null ||
+                    children.none { child -> child.archived && child.id == it.revision.childId }) &&
                 (!onlyMine || isResponsible(it.revision.responsibleParentId, uid))
         }
         .sortedWith(

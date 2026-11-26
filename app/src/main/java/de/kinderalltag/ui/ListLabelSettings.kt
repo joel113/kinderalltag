@@ -167,6 +167,10 @@ private fun LabelManager(
                                         BearColor.GREEN -> text(TextKey.GREEN)
                                         BearColor.HONEY -> text(TextKey.YELLOW)
                                         BearColor.BROWN -> text(TextKey.BROWN)
+                                        BearColor.TEAL -> text(TextKey.CHILD_COLOR_TEAL)
+                                        BearColor.ORANGE -> text(TextKey.CHILD_COLOR_ORANGE)
+                                        BearColor.CORAL -> text(TextKey.CHILD_COLOR_CORAL)
+                                        BearColor.INDIGO -> text(TextKey.CHILD_COLOR_INDIGO)
                                         BearColor.PURPLE -> text(TextKey.PURPLE)
                                     },
                                 color = choice,

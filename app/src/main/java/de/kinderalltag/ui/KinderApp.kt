@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -303,6 +302,7 @@ fun KinderApp(
     var selectedChild by rememberSaveable { mutableStateOf<String?>(null) }
     var onlyMine by rememberSaveable { mutableStateOf(false) }
     var homeDayOffset by rememberSaveable { mutableLongStateOf(0L) }
+    var taskCreationDate by rememberSaveable { mutableStateOf<LocalDate?>(null) }
     var taskMessageIndex by rememberSaveable { mutableIntStateOf(-1) }
     var appointmentMessageIndex by rememberSaveable { mutableIntStateOf(0) }
     var openedImportKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -564,21 +564,37 @@ fun KinderApp(
                             YellowAddButton(text(TextKey.TASK), Modifier.weight(1f)) {
                                 editing = null
                                 taskEditSelection = null
+                                taskCreationDate = today.plusDays(homeDayOffset)
                                 editorOpen = true
                             }
                             YellowAddButton(text(TextKey.APPOINTMENT), Modifier.weight(1f)) {
-                                appointmentUi.editor = AppointmentEditTarget(null)
+                                appointmentUi.editor =
+                                    AppointmentEditTarget(
+                                        null,
+                                        initialDate = today.plusDays(homeDayOffset),
+                                    )
                             }
                         }
                     AppPage.TASKS ->
                         YellowAddButton(text(TextKey.TASK)) {
                             editing = null
                             taskEditSelection = null
+                            taskCreationDate =
+                                taskCalendar.focus.takeIf {
+                                    showCalendars && taskCalendar.filterActive
+                                } ?: today
                             editorOpen = true
                         }
                     AppPage.APPOINTMENTS ->
                         YellowAddButton(text(TextKey.APPOINTMENT)) {
-                            appointmentUi.editor = AppointmentEditTarget(null)
+                            appointmentUi.editor =
+                                AppointmentEditTarget(
+                                    null,
+                                    initialDate =
+                                        appointmentCalendar.focus.takeIf {
+                                            showCalendars && appointmentCalendar.filterActive
+                                        },
+                                )
                         }
                     AppPage.SHOPPING ->
                         YellowAddButton(text(TextKey.SHOPPING_ITEM)) {
@@ -878,12 +894,18 @@ fun KinderApp(
             if (taskEditSelection == null) taskSaveError
             else vm.operationError.collectAsStateWithLifecycle().value,
             selection = taskEditSelection,
+            initialDate = taskCreationDate,
             syncError = state.error,
             onRetrySync = vm::retrySync,
             onDismiss = { if (!busy) editorOpen = false },
-            onSave = { draft ->
+            onSave = { draft, childIds ->
                 val selection = taskEditSelection
-                if (selection == null) vm.save(draft) { editorOpen = false }
+                if (selection == null)
+                    vm.saveTasks(
+                        tasksForChildren(draft, childIds) { UUID.randomUUID().toString() }
+                    ) {
+                        editorOpen = false
+                    }
                 else
                     vm.saveTaskEdit(selection, draft) {
                         editorOpen = false
@@ -973,6 +995,8 @@ internal fun Checklist(
     val due =
         state.taskOccurrences(date).filter {
             showTasks &&
+                (childId != null ||
+                    state.children.none { c -> c.archived && c.id == it.revision.childId }) &&
                 (childId == null || it.revision.childId == childId) &&
                 (!onlyMine || isResponsible(it.revision.responsibleParentId, state.uid))
         }
@@ -982,6 +1006,7 @@ internal fun Checklist(
         else emptyList()
     val upcomingTasks =
         remember(
+            state.children,
             state.revisions,
             state.events,
             state.itemOperations,
@@ -1006,11 +1031,13 @@ internal fun Checklist(
                     onlyMine,
                     days = upcomingTaskDays,
                     excludedTaskIds = dueTaskIds,
+                    children = state.children,
                 )
             else emptyList()
         }
     val overdueTasks =
         remember(
+            state.children,
             state.revisions,
             state.events,
             state.itemOperations,
@@ -1033,6 +1060,7 @@ internal fun Checklist(
                     childId,
                     state.uid,
                     onlyMine,
+                    children = state.children,
                 )
             else emptyList()
         }
@@ -1183,7 +1211,7 @@ internal fun Checklist(
                 }
         }
         state.sections
-            .filter { childId == null || childId == it.id }
+            .filter { (childId != null || !it.archived) && (childId == null || childId == it.id) }
             .forEach { child ->
                 val tasks = displayedTasks.filter { it.revision.childId == child.id }
                 if (tasks.isNotEmpty()) {
@@ -1356,7 +1384,12 @@ private fun AppChildChip(child: Child, selected: Boolean, onClick: () -> Unit) {
     FilterChip(
         selected,
         onClick,
-        label = { Text(child.name, fontWeight = FontWeight.SemiBold) },
+        label = {
+            Text(
+                child.name + if (child.archived) " (" + text(TextKey.CHILD_ARCHIVED) + ")" else "",
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
         leadingIcon = { ChildIcon(child, Modifier.size(26.dp)) },
         colors =
             FilterChipDefaults.filterChipColors(
@@ -1400,6 +1433,7 @@ private fun TaskList(
                 onlyMine,
                 state.events,
                 state.itemOperations,
+                children = state.children,
             )
         else emptyMap()
     val editableVersions =
@@ -1419,6 +1453,8 @@ private fun TaskList(
     val filteredTasks =
         scheduledTasks.filter {
             (sectionId == null || it.childId == sectionId) &&
+                (sectionId != null ||
+                    state.children.none { c -> c.id == it.childId && c.archived }) &&
                 (!onlyMine || isResponsible(it.responsibleParentId, state.uid))
         }
     val timings =
@@ -1438,6 +1474,8 @@ private fun TaskList(
             .filter { task ->
                 !task.active &&
                     (sectionId == null || task.childId == sectionId) &&
+                    (sectionId != null ||
+                        state.children.none { c -> c.archived && c.id == task.childId }) &&
                     (!onlyMine || isResponsible(task.responsibleParentId, state.uid))
             }
             .sortedWith(
@@ -1900,9 +1938,6 @@ private fun Settings(
     }
     var pendingPermission by rememberSaveable { mutableStateOf<String?>(null) }
     var showImpressum by rememberSaveable { mutableStateOf(false) }
-    var rename by remember { mutableStateOf<Child?>(null) }
-    var name by remember { mutableStateOf("") }
-    var bearColor by remember { mutableStateOf(BearColor.BLUE) }
     fun setNotificationChoice(choice: String, value: Boolean) {
         when (choice) {
             "reminders" -> {
@@ -2202,38 +2237,16 @@ private fun Settings(
                 Icons.Default.ChildCare,
                 AppTheme.colors.secondary,
             ) {
-                Text(
-                    text(TextKey.A_BEAR_AND_A_FAVOURITE_COLOUR_FOR_EACH_CHILD),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                state.children.forEach { child ->
-                    OutlinedButton(
-                        onClick = {
-                            rename = child
-                            name = child.name
-                            bearColor = child.bearColor
-                        },
-                        enabled = !busy && !state.fromCache,
-                        shape = RoundedCornerShape(18.dp),
-                        colors =
-                            ButtonDefaults.outlinedButtonColors(contentColor = childColor(child)),
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(12.dp),
-                    ) {
-                        ChildIcon(child, Modifier.padding(end = 12.dp).size(42.dp))
-                        Column(
-                            Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            Text(child.name, fontWeight = FontWeight.Bold)
-                            Text(
-                                text(TextKey.NAME_BEAR_COLOUR),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        Icon(Icons.Default.Edit, null, Modifier.size(20.dp))
-                    }
-                }
+                ChildrenSettings(state, busy, vm::saveChild, vm::retrySync)
+            }
+        }
+        item {
+            SettingsSection(
+                text(TextKey.APPOINTMENTS),
+                Icons.Default.Event,
+                AppTheme.colors.primary,
+            ) {
+                AppointmentDurationSettings()
             }
         }
         item {
@@ -2297,118 +2310,7 @@ private fun Settings(
         item { EndOfPageFooter(IllustrationRole.AFFECTION) }
     }
     if (showImpressum) ImpressumDialog { showImpressum = false }
-    rename?.let { child ->
-        AlertDialog(
-            onDismissRequest = { if (!busy) rename = null },
-            title = { Text(text(TextKey.CHILD_PROFILE)) },
-            text = {
-                Column(
-                    Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    OutlinedTextField(
-                        name,
-                        { name = it },
-                        label = { Text(text(TextKey.NAME)) },
-                        singleLine = true,
-                        enabled = !busy,
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        ChildIcon(child.copy(bearColor = bearColor), Modifier.size(72.dp))
-                        Text(
-                            text(TextKey.BEAR_COLOUR),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                    Column(
-                        Modifier.selectableGroup(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        BearColor.entries.chunked(3).forEach { choices ->
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
-                            ) {
-                                choices.forEach { choice ->
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    ) {
-                                        Box(
-                                            Modifier.size(48.dp)
-                                                .selectable(
-                                                    choice == bearColor,
-                                                    enabled = !busy,
-                                                    role = Role.RadioButton,
-                                                ) {
-                                                    bearColor = choice
-                                                }
-                                                .semantics {
-                                                    contentDescription = bearColorLabel(choice)
-                                                }
-                                                .background(Color(choice.argb), CircleShape)
-                                                .border(
-                                                    if (choice == bearColor) 3.dp else 0.dp,
-                                                    if (choice == bearColor) AppTheme.colors.ink
-                                                    else Color.Transparent,
-                                                    CircleShape,
-                                                ),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            if (choice == bearColor)
-                                                Icon(
-                                                    Icons.Default.Check,
-                                                    null,
-                                                    tint =
-                                                        if (choice == BearColor.HONEY)
-                                                            AppTheme.colors.ink
-                                                        else Color.White,
-                                                )
-                                        }
-                                        Text(
-                                            bearColorLabel(choice),
-                                            style = MaterialTheme.typography.bodySmall,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.saveChild(child.copy(name = name.trim(), bearColor = bearColor)) {
-                            rename = null
-                        }
-                    },
-                    enabled = !busy && !state.fromCache && name.isNotBlank() && name.length <= 60,
-                ) {
-                    Text(if (busy) text(TextKey.SAVING) else text(TextKey.SAVE))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { rename = null }, enabled = !busy) {
-                    Text(text(TextKey.CANCEL))
-                }
-            },
-        )
-    }
 }
-
-private fun bearColorLabel(color: BearColor) =
-    when (color) {
-        BearColor.BLUE -> text(TextKey.BLUE)
-        BearColor.ROSE -> text(TextKey.PINK)
-        BearColor.GREEN -> text(TextKey.GREEN)
-        BearColor.HONEY -> text(TextKey.HONEY)
-        BearColor.BROWN -> text(TextKey.BROWN)
-        BearColor.PURPLE -> text(TextKey.PURPLE)
-    }
 
 @Composable
 private fun TaskEditor(
@@ -2420,10 +2322,11 @@ private fun TaskEditor(
     offline: Boolean,
     saveError: String?,
     selection: TaskEditSelection? = null,
+    initialDate: LocalDate? = null,
     syncError: String?,
     onRetrySync: () -> Unit,
     onDismiss: () -> Unit,
-    onSave: (TaskRevision) -> Unit,
+    onSave: (TaskRevision, Set<String>) -> Unit,
 ) {
     val formats = rememberDateTimeFormats()
     val effective = today
@@ -2433,8 +2336,9 @@ private fun TaskEditor(
     var title by rememberSaveable { mutableStateOf(existing?.title ?: "") }
     var notes by rememberSaveable { mutableStateOf(existing?.notes ?: "") }
     var childId by rememberSaveable {
-        mutableStateOf(existing?.childId ?: children.firstOrNull()?.id.orEmpty())
+        mutableStateOf(existing?.childId ?: children.firstOrNull { !it.archived }?.id.orEmpty())
     }
+    var selectedChildren by remember { mutableStateOf(setOf(childId)) }
     var responsibleParent by rememberSaveable { mutableStateOf(existing?.responsibleParentId) }
     var frequency by rememberSaveable {
         mutableStateOf(if (single) Frequency.ONCE else existing?.frequency ?: Frequency.DAILY)
@@ -2453,7 +2357,7 @@ private fun TaskEditor(
             else
                 existing?.start?.let {
                     if (existing.frequency == Frequency.ONCE && it < effective) effective else it
-                } ?: effective
+                } ?: initialDate ?: effective
         )
     }
     var end by rememberSaveable { mutableStateOf(existing?.end) }
@@ -2528,9 +2432,41 @@ private fun TaskEditor(
                             Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            children.forEach { child ->
-                                AppChildChip(child, childId == child.id) { childId = child.id }
+                            if (existing == null) {
+                                val ids =
+                                    children
+                                        .filter { !it.archived && it.id != "haushalt" }
+                                        .map { it.id }
+                                        .toSet()
+                                if (ids.isNotEmpty())
+                                    FilterChip(
+                                        selectedChildren == ids,
+                                        {
+                                            selectedChildren = ids
+                                            childId = ids.first()
+                                        },
+                                        label = { Text(text(TextKey.ALL_CHILDREN)) },
+                                    )
                             }
+                            children
+                                .filter { !it.archived || it.id == existing?.childId }
+                                .forEach { child ->
+                                    AppChildChip(
+                                        child,
+                                        if (existing == null) child.id in selectedChildren
+                                        else childId == child.id,
+                                    ) {
+                                        if (existing != null) childId = child.id
+                                        else {
+                                            selectedChildren =
+                                                if (child.id == "haushalt") setOf("haushalt")
+                                                else if (child.id in selectedChildren)
+                                                    selectedChildren - child.id
+                                                else selectedChildren - "haushalt" + child.id
+                                            childId = selectedChildren.firstOrNull().orEmpty()
+                                        }
+                                    }
+                                }
                         }
                     }
                     item { AssignmentPicker(parents, responsibleParent) { responsibleParent = it } }
@@ -2677,7 +2613,8 @@ private fun TaskEditor(
                     else if (offline) item { Text(text(TextKey.EDITING_REQUIRES_A_CONNECTION)) }
                     item {
                         Button(
-                            enabled = !busy && !offline && children.isNotEmpty(),
+                            enabled =
+                                !busy && !offline && childId.isNotBlank() && children.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth(),
                             onClick = {
                                 try {
@@ -2733,7 +2670,10 @@ private fun TaskEditor(
                                         )
                                     }
                                     error = null
-                                    onSave(revision)
+                                    onSave(
+                                        revision,
+                                        if (existing == null) selectedChildren else setOf(childId),
+                                    )
                                 } catch (e: Exception) {
                                     error = e.message ?: text(TextKey.PLEASE_CHECK_YOUR_ENTRIES)
                                 }

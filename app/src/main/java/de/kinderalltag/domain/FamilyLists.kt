@@ -60,13 +60,7 @@ data class FamilyListItem(
         }
         requireLocalized(
             if (kind == FamilyListKind.SHOPPING) recipient == null
-            else
-                recipient in
-                    listOf(
-                        AppointmentRecipient.FERDINAND,
-                        AppointmentRecipient.JOHANN,
-                        AppointmentRecipient.BOTH_CHILDREN,
-                    )
+            else recipient != null && !recipient.household
         ) {
             message(TextKey.PLEASE_SELECT_ONE_CHILD_OR_BOTH_CHILDREN)
         }

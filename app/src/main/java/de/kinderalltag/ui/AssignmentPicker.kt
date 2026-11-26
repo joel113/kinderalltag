@@ -7,7 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import de.kinderalltag.domain.Parent
+import de.kinderalltag.domain.*
 import de.kinderalltag.text.*
 
 internal fun responsibilityName(parentId: String?, parents: List<Parent>): String =
@@ -39,5 +39,51 @@ internal fun AssignmentPicker(
                 )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ChildRecipientPicker(
+    children: List<Child>,
+    selected: AppointmentRecipient,
+    household: Boolean = true,
+    enabled: Boolean = true,
+    onSelect: (AppointmentRecipient) -> Unit,
+) {
+    val active = children.filter { !it.archived && it.id != "haushalt" }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (active.isNotEmpty())
+            FilterChip(
+                !selected.household && selected.childIds == active.map { it.id }.toSet(),
+                { onSelect(AppointmentRecipient.children(active.map { it.id }.toSet())) },
+                enabled = enabled,
+                label = { Text(text(TextKey.ALL_CHILDREN)) },
+            )
+        children
+            .filter { it.id != "haushalt" && (!it.archived || it.id in selected.childIds) }
+            .forEach { child ->
+                FilterChip(
+                    !selected.household && child.id in selected.childIds,
+                    { onSelect(selected.toggleChild(child.id)) },
+                    enabled =
+                        enabled && (child.id in selected.childIds || selected.childIds.size < 10),
+                    label = {
+                        Text(
+                            child.name +
+                                if (child.archived) " (" + text(TextKey.CHILD_ARCHIVED) + ")"
+                                else ""
+                        )
+                    },
+                    leadingIcon = { ChildIcon(child, Modifier.size(24.dp)) },
+                )
+            }
+        if (household)
+            FilterChip(
+                selected.household,
+                { onSelect(AppointmentRecipient.HOUSEHOLD) },
+                enabled = enabled,
+                label = { Text(text(TextKey.HOUSEHOLD)) },
+            )
     }
 }

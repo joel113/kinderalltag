@@ -1,6 +1,78 @@
 package de.kinderalltag.text
 
 enum class TextKey(val resourceName: String, val german: String) {
+    DEFAULT_APPOINTMENT_DURATION("msg_default_appointment_duration", "Standarddauer für Termine"),
+    APPOINTMENT_DURATION_RANGE(
+        "msg_appointment_duration_range",
+        "1 bis 720 Minuten · auf diesem Gerät · Standard: 60",
+    ),
+    APPOINTMENT_DURATION_MINUTES("msg_appointment_duration_minutes", "%1\$s Min."),
+    APPOINTMENT_DURATION_HELP(
+        "msg_appointment_duration_help",
+        "Die Endzeit folgt der gewählten Startzeit, bis du die Endzeit selbst änderst. Bestehende Termine behalten beim Öffnen ihre Uhrzeiten.",
+    ),
+    APPOINTMENT_DURATION_CLIPPED(
+        "msg_appointment_duration_clipped",
+        "Die vorgeschlagene Endzeit ist auf 23:59 Uhr begrenzt, da Termine am selben Tag enden müssen.",
+    ),
+    CHILD_SETUP_FAILED(
+        "msg_child_setup_failed",
+        "Kinderprofile werden vorbereitet. Falls dies nicht gelingt, prüfe Verbindung und veröffentlichte Firebase-Regeln und versuche es erneut.",
+    ),
+    CHILD_NAME_REQUIRED(
+        "msg_child_name_required",
+        "Bitte einen Namen mit 1 bis 60 Zeichen eingeben.",
+    ),
+    CHILD_CHANGED_RELOAD(
+        "msg_child_changed_reload",
+        "Das Kinderprofil wurde inzwischen geändert. Bitte schließe es und öffne es erneut.",
+    ),
+    TEN_ACTIVE_CHILDREN(
+        "msg_ten_active_children",
+        "Bis zu 10 aktive Kinder. Archiviere ein Profil, um Platz zu schaffen.",
+    ),
+    CHILDREN_HELP(
+        "msg_children_help",
+        "Namen, Symbole und Lieblingsfarben für bis zu 10 Kinder. Änderungen gelten auf beiden Handys.",
+    ),
+    CHILD_ARCHIVED("msg_child_archived", "Archiviert"),
+    CHILD_ARCHIVE("msg_child_archive", "Archivieren"),
+    CHILD_RESTORE("msg_child_restore", "Wieder aktivieren"),
+    CHILD_ARCHIVE_HELP(
+        "msg_child_archive_help",
+        "Aufgaben und Termine werden im Alltag ausgeblendet, wenn kein aktives Kind beteiligt ist. Erinnerungen werden ausgesetzt. Alle Daten und der Verlauf bleiben erhalten.",
+    ),
+    CHILD_RESTORE_HELP(
+        "msg_child_restore_help",
+        "Das Profil wird wieder aktiv. Aufgaben, Termine und Erinnerungen werden nach den bestehenden Zeitplänen wieder angezeigt.",
+    ),
+    ADD_CHILD("msg_add_child", "Kind hinzufügen"),
+    ADD_CHILD_FIRST(
+        "msg_add_child_first",
+        "Bitte zuerst ein Kind in den Einstellungen hinzufügen.",
+    ),
+    CHILD_ICON("msg_child_icon", "Symbol"),
+    CHILD_COLOR("msg_child_color", "Lieblingsfarbe"),
+    ALL_CHILDREN("msg_all_children", "Alle Kinder"),
+    CONFIRM("msg_confirm", "Bestätigen"),
+    CHILD_STATISTICS_HELP(
+        "msg_child_statistics_help",
+        "Gemeinsame Termine und Geschenkideen zählen je beteiligtem Kind. Die Gesamtsumme zählt jedes Ereignis einmal.",
+    ),
+    CHILD_ICON_BEAR("msg_child_icon_bear", "Bär"),
+    CHILD_ICON_FOX("msg_child_icon_fox", "Fuchs"),
+    CHILD_ICON_RABBIT("msg_child_icon_rabbit", "Hase"),
+    CHILD_ICON_LION("msg_child_icon_lion", "Löwe"),
+    CHILD_ICON_ELEPHANT("msg_child_icon_elephant", "Elefant"),
+    CHILD_ICON_WHALE("msg_child_icon_whale", "Wal"),
+    CHILD_ICON_PENGUIN("msg_child_icon_penguin", "Pinguin"),
+    CHILD_ICON_DINOSAUR("msg_child_icon_dinosaur", "Dinosaurier"),
+    CHILD_ICON_TRACTOR("msg_child_icon_tractor", "Traktor"),
+    CHILD_ICON_UNICORN("msg_child_icon_unicorn", "Einhorn"),
+    CHILD_COLOR_TEAL("msg_child_color_teal", "Türkis"),
+    CHILD_COLOR_ORANGE("msg_child_color_orange", "Orange"),
+    CHILD_COLOR_CORAL("msg_child_color_coral", "Koralle"),
+    CHILD_COLOR_INDIGO("msg_child_color_indigo", "Indigo"),
     DELETED("msg_deleted", " gelöscht"),
     CHANGED("msg_changed", " geändert"),
     RECORDED_BY("msg_recorded_by", " · eingetragen von %1\$s"),
@@ -206,7 +278,7 @@ enum class TextKey(val resourceName: String, val german: String) {
     PLEASE_SELECT_A_CHILD("msg_please_select_a_child", "Bitte ein Kind auswählen."),
     PLEASE_SELECT_ONE_CHILD_OR_BOTH_CHILDREN(
         "msg_please_select_one_child_or_both_children",
-        "Bitte ein Kind oder beide Kinder auswählen.",
+        "Bitte mindestens ein Kind auswählen.",
     ),
     PLEASE_SHARE_A_CALENDAR_FILE_USING_THE_FILE_PICKER(
         "msg_please_share_a_calendar_file_using_the_file_picker",
@@ -607,7 +679,7 @@ enum class TextKey(val resourceName: String, val german: String) {
     FOR("msg_recipient_for", "Für"),
     FOR_FERDINAND_AND_JOHANN_AND_FOR_BOTH_OF_YOU(
         "msg_for_ferdinand_and_johann_and_for_both_of_you",
-        "Für Ferdinand und Johann – und für euch beide.",
+        "Für eure Kinder – und für euch.",
     ),
     THIS_CHANGE_REQUIRES_A_CURRENT_SERVER_CONNECTION(
         "msg_this_change_requires_a_current_server_connection",

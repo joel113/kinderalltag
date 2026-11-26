@@ -71,12 +71,14 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
         }
     }
 
-    fun save(revision: TaskRevision, done: () -> Unit) =
+    fun save(revision: TaskRevision, done: () -> Unit) = saveTasks(listOf(revision), done)
+
+    fun saveTasks(revisions: List<TaskRevision>, done: () -> Unit) =
         viewModelScope.launch {
             busy.value = true
             taskError.value = null
             try {
-                repository.saveRevision(revision)
+                repository.saveRevisions(revisions)
                 done()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -163,12 +165,18 @@ class FamilyViewModel(val repository: FamilyRepository) : ViewModel() {
             try {
                 repository.saveChild(child)
                 done()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 message.value =
-                    text(
-                        TextKey
-                            .THE_CHILD_PROFILE_COULD_NOT_BE_SAVED_CHECK_YOUR_CONNECTION_AND_ACCESS_RU
-                    )
+                    generateSequence<Throwable>(e) { it.cause }
+                        .firstOrNull {
+                            it is LocalizedArgumentException || it is LocalizedStateException
+                        }
+                        ?.message
+                        ?: text(
+                            TextKey
+                                .THE_CHILD_PROFILE_COULD_NOT_BE_SAVED_CHECK_YOUR_CONNECTION_AND_ACCESS_RU
+                        )
             } finally {
                 busy.value = false
             }

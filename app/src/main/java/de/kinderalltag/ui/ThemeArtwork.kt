@@ -292,7 +292,7 @@ internal fun DrawScope.drawCar(c: AppPalette) {
     }
 }
 
-private fun DrawScope.dinosaur(c: AppPalette) {
+internal fun DrawScope.dinosaur(c: AppPalette) {
     drawPath(
         Path().apply {
             moveTo(20f, 70f)
